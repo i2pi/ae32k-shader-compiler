@@ -36,8 +36,8 @@ __qmul_b:
     lea (%R9,0),%R10
     lsr 16,%R10             // bh
     mul %R10,%R12           // hi = ah*bh
-    cmp 32767,%R12
-    jnc __qmul_sat          // hi >= 0x7fff
+    cmp 32767,%R12          // !fast
+    jnc __qmul_sat          // !fast: hi >= 0x7fff
     asl 16,%R12             // hi << 16
     and 65535,%R8           // al
     and 65535,%R9           // bl
@@ -50,9 +50,9 @@ __qmul_b:
     lsr 16,%R8
     add %R8,%R12            // r (mod 2^32, as the C)
     lea (%R12,0),%R8
-    cmpq 0,%R8
-    jge __qmul_sign         // r >= 0x7fffffff clamps; only r >= 2^31 changes anything
-    ldi 2147483647,%R8
+    cmpq 0,%R8              // !fast
+    jge __qmul_sign         // !fast: r >= 0x7fffffff clamps; only r >= 2^31 changes anything
+    ldi 2147483647,%R8      // !fast
 __qmul_sign:
     cmpq 0,%R11
     jge __qmul_ret
@@ -360,7 +360,9 @@ __vh:                       // R8 = ix, R9 = iy -> 16-bit hash
 };
 
 /// The assembly for [names] and everything they depend on, each routine once.
-String runtimeFor(Iterable<String> names) {
+///
+/// [fast] drops the lines tagged `!fast` (saturation and zero tests).
+String runtimeFor(Iterable<String> names, {bool fast = false}) {
   final want = <String>{};
   void add(String n) {
     if (!want.add(n)) return;
@@ -372,7 +374,8 @@ String runtimeFor(Iterable<String> names) {
   for (final n in names) {
     add(n);
   }
-  return [for (final n in routines.keys) if (want.contains(n)) routines[n]!.asm].join('\n');
+  final asm = [for (final n in routines.keys) if (want.contains(n)) routines[n]!.asm].join('\n');
+  return fast ? asm.split('\n').where((l) => !l.contains('!fast')).join('\n') : asm;
 }
 
 final _qdiv = '''
@@ -387,8 +390,8 @@ __qdiv_a:
     jge __qdiv_b
     neg %R9
 __qdiv_b:
-    cmpq 0,%R9
-    jz __qdiv_zero          // b == 0: 0
+    cmpq 0,%R9              // !fast
+    jz __qdiv_zero          // !fast: b == 0 gives 0 (fast: the saturation test below catches it)
     ldi 0,%R11              // q
     cmp %R9,%R8
     jc __qdiv_frac          // |a| < |b|: no integer part

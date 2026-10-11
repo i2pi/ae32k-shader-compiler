@@ -5,7 +5,17 @@ import 'q16.dart';
 
 /// Inputs by name (abi.dart ctxInput) and the 16 outputs as the resident left them
 /// (zero, or 1.0 for `gain` map entries). Returns the outputs after the stage ran.
-List<int> evaluate(Program p, Map<String, int> inputs, [List<int>? outInit]) {
+List<int> evaluate(Program p, Map<String, int> inputs, [List<int>? outInit, bool fast = false]) {
+  final was = qFast;
+  qFast = fast;
+  try {
+    return _evaluate(p, inputs, outInit);
+  } finally {
+    qFast = was;
+  }
+}
+
+List<int> _evaluate(Program p, Map<String, int> inputs, List<int>? outInit) {
   final out = List<int>.of(outInit ?? List.filled(16, 0));
   final env = {for (final l in p.locals) l: 0};
 

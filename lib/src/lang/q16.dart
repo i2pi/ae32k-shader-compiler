@@ -12,14 +12,18 @@ int u32(int v) => v & 0xffffffff;
 /// C `(unsigned)a` for a negative int, negated: `-(unsigned)a`.
 int _uabs(int a) => a < 0 ? u32(-a) : a;
 
+/// Fast mode (compileStage(fast: true)): q_mul and q_div skip their saturation, and q_div
+/// its zero-divisor test, so overflow wraps. Set only through evaluate(fast: true).
+bool qFast = false;
+
 int qMul(int a, int b) {
   final neg = (u32(a) ^ u32(b)) >> 31;
   final ua = _uabs(a), ub = _uabs(b);
   final ah = ua >> 16, al = ua & 0xffff, bh = ub >> 16, bl = ub & 0xffff;
   final hi = u32(ah * bh);
-  if (hi >= 0x7fff) return neg != 0 ? -0x7fffffff : 0x7fffffff;
+  if (hi >= 0x7fff && !qFast) return neg != 0 ? -0x7fffffff : 0x7fffffff;
   var r = u32((hi << 16) + ah * bl + al * bh + (u32(al * bl) >> 16));
-  if (r >= 0x7fffffff) r = 0x7fffffff;
+  if (r >= 0x7fffffff && !qFast) r = 0x7fffffff;
   return neg != 0 ? i32(-r) : i32(r);
 }
 
@@ -27,7 +31,7 @@ int qDiv(int a, int b) {
   final neg = (u32(a) ^ u32(b)) >> 31;
   final ua = _uabs(a), ub = _uabs(b);
   var q = 0, r = 0;
-  if (ub == 0) return 0;
+  if (ub == 0 && !qFast) return 0; // fast: the loop below gives +-0x7fffffff, as the native code
   for (var i = 47; i >= 0; i--) {
     final bit = i >= 16 ? (ua >> (i - 16)) & 1 : 0;
     if (r & 0x80000000 != 0) r = 0x7fffffff;

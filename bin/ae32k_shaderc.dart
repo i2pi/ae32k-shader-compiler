@@ -1,7 +1,7 @@
 // ae32k_shaderc: compile a Scion shader stage to native AE32000 code (no gcc, no Wine),
 // optionally check it in the emulator and upload it over OSC.
 //
-//   dart run bin/ae32k_shaderc.dart file.ss [--scan | --vert | --slot N] [--asm] [--out f.bin]
+//   dart run bin/ae32k_shaderc.dart file.ss [--scan | --vert | --slot N] [--fast] [--asm] [--out f.bin]
 //                                   [--check N] [--osc] [--host IP] [--port P] [--knobs a,b,..]
 // Same slots and upload as tools/imcu/shader.py: warp = slot 0 (default), --scan = 1, --vert = 2.
 import 'dart:io';
@@ -17,6 +17,8 @@ const usage = '''usage: ae32k_shaderc <file.ss> [options]
   --scan / --vert / --slot N   target slot (default 0, the warp stage)
   --asm                        print the generated assembly
   --out FILE                   write the blob (little-endian words, as uploaded)
+  --fast                       no overflow saturation in * and /, no divide-by-zero test:
+                               overflow wraps, x / 0 gives +-32767.99 (faster, smaller)
   --check N                    run N random evaluations in the emulator against the reference
   --osc                        upload over OSC (/send/1/shader/part...) to --host (\$SCION_IP)
   --host IP  --port P          default 192.168.100.221:9000
@@ -45,10 +47,11 @@ Future<void> main(List<String> args) async {
     }
     return;
   }
+  final fast = args.contains('--fast');
   final src = File(file).readAsStringSync();
   final CompiledStage st;
   try {
-    st = compileStage(src, slot: slot);
+    st = compileStage(src, slot: slot, fast: fast);
   } on ShaderSyntaxError catch (e) {
     stderr.writeln('$file: $e');
     exit(1);
@@ -84,7 +87,7 @@ Future<void> main(List<String> args) async {
       }
       final stats = <String, int>{};
       final got = runner.run(inputs, outInit: init, stats: stats);
-      final want = evaluate(prog, inputs, init);
+      final want = evaluate(prog, inputs, init, fast);
       if (got.join(',') != want.join(',')) {
         stderr.writeln('check FAILED for inputs $inputs:\n  native    $got\n  reference $want');
         exit(2);

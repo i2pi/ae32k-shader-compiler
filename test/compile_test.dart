@@ -12,11 +12,11 @@ import 'package:test/test.dart';
 import 'emu_gcc_test.dart' show randomInputs;
 import 'support/random_program.dart';
 
-void checkProgram(String name, String src, int slot, Random rng, {int runs = 100}) {
+void checkProgram(String name, String src, int slot, Random rng, {int runs = 100, bool fast = false}) {
   final prog = parse(src);
   final CompiledStage st;
   try {
-    st = compileStage(src, slot: slot);
+    st = compileStage(src, slot: slot, fast: fast);
   } catch (e) {
     fail('$name does not compile: $e\n$src');
   }
@@ -33,7 +33,7 @@ void checkProgram(String name, String src, int slot, Random rng, {int runs = 100
     } catch (e) {
       fail('$name: $e\n$src\n${st.asm}');
     }
-    final want = evaluate(prog, inputs, init);
+    final want = evaluate(prog, inputs, init, fast);
     if (got.join(',') != want.join(',')) {
       fail('$name: outputs differ\ninputs $inputs\nwant $want\ngot  $got\n$src\n${st.asm}');
     }
@@ -61,6 +61,32 @@ void main() {
         final inputs = {'x': x, 'y': -x};
         expect(runner.run(inputs).sublist(0, 2), evaluate(prog, inputs).sublist(0, 2), reason: 'x=$x c=$c');
       }
+    }
+  });
+
+  for (final fast in [false, true]) {
+    test('q_div / q_mod by powers of two (inline)${fast ? ', fast' : ''}', () {
+      const consts = ['8', '-8', '2', '0.5', '-0.25', '1', '-1', '0.0000153', '-16384', '256', '0.125', '16384'];
+      const xs = [0, 1, -1, 7, -7, 0xffff, 0x10000, -0x10000, 0x18000, 0x7fffffff, -0x7fffffff, -0x80000000,
+        0x7fff0000, 0x12345, -0x12345, 0x3fffffff, 0x40000000, 0xfffff, 0x100000, -0x100001, 1 << 30];
+      for (final c in consts) {
+        final src = 'out.dx = in.x / $c;\nout.dy = mod(in.x, $c);\nout.o2 = in.y % $c;';
+        final runner = StageRunner(compileStage(src, fast: fast).bytes);
+        expect(compileStage(src, fast: fast).asm, isNot(contains('jal __qdiv')), reason: c);
+        final prog = parse(src);
+        for (final x in xs) {
+          final inputs = {'x': x, 'y': -x};
+          expect(runner.run(inputs).sublist(0, 3), evaluate(prog, inputs, null, fast).sublist(0, 3), reason: 'x=$x c=$c');
+        }
+      }
+    });
+  }
+
+  test('400 random programs, fast', () {
+    final rng = Random(20261012);
+    final gen = RandomProgram(rng);
+    for (var n = 0; n < 400; n++) {
+      checkProgram('fast random #$n', gen.program(), 0, rng, runs: 40, fast: true);
     }
   });
 

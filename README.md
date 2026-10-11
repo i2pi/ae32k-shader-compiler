@@ -7,7 +7,7 @@ it runs as a CLI and inside `scion_controller_app` on every Flutter platform.
 ## Use
 
 ```
-dart run bin/ae32k_shaderc.dart file.ss [--scan|--vert] [--asm] [--out f.bin] [--check N] [--osc --host IP --knobs a,b]
+dart run bin/ae32k_shaderc.dart file.ss [--scan|--vert] [--fast] [--asm] [--out f.bin] [--check N] [--osc --host IP --knobs a,b]
 dart compile exe bin/ae32k_shaderc.dart -o ae32k_shaderc     # a standalone binary (a stage compiles in well under a second, no Wine)
 ```
 
@@ -15,7 +15,24 @@ Same slots, upload paths and packets as `tools/imcu/shader.py` (pinned by `test/
 From Dart/Flutter: `compileStage(source, slot: n)` (pure Dart, any platform) and
 `uploadStage(stage, host)` from `package:ae32k_shader_compiler/upload.dart` (dart:io).
 
-## How it is checked (no hardware yet)
+`--fast` (`compileStage(..., fast: true)`) drops the overflow handling: `*` wraps instead of
+saturating at +-32767.99, and `x / 0` gives +-32767.99 instead of 0. `/` still saturates (the
+division routine needs that test to terminate). Every other result is identical to the exact
+build. On the examples it is 5-55% faster and 15-60% smaller (emulator).
+
+## Optimisations
+
+Results stay bit-exact with shader.py's C (in `--fast` mode, with the same C minus the checks):
+- `/`: integer part by shift-and-subtract only when |a| >= |b|, then 16 unrolled fraction steps
+  (~150 cycles instead of ~840). Division and `mod` by a constant power of two are inline shifts.
+- `*` by any constant is inline; `noise()` multiplies only fractions, so each of its seven
+  q_mul is one MUL (ranges checked exhaustively).
+- Constant subexpressions are folded with the reference; comparisons, `&&`/`||`, `abs`, `min`,
+  `max`, `clamp`, `floor`, `frac`, `step`, `sign` and `lerp` are inline.
+
+`tool/profile.dart file.ss [--fast]` shows where the cycles go (per runtime routine).
+
+## How it is checked
 
 | Layer | Checked against |
 |---|---|
@@ -24,12 +41,13 @@ From Dart/Flutter: `compileStage(source, slot: n)` (pure Dart, any platform) and
 | Q16 runtime in assembly (`lib/src/runtime.dart`) | `q16.dart` (bit-exact port of shader.py's C) on edge + random arguments |
 | Compiler (`lib/src/codegen.dart`) | the reference on every corpus program + 400 random programs, in the emulator |
 
-`tool/bench.dart`: native vs gcc on the corpus, emulated (an estimate, not hardware): mean blob
-1775 -> 578 bytes, mean cycles per evaluation 1625 -> 1383.
-
-Not yet done: a run on the device. The emulator's flag semantics come from the quick
-reference and from gcc's code agreeing with the reference; `NEG`'s flags, the 3-LERI forms and
-the DSP-extension instructions are unverified on the MDIN core and the compiler avoids them.
+On the device (2026-10-11, `tool/hw_bench.dart --stages` through the resident's
+`imcu hybrun a` hook): 17 native stages matched the reference bit for bit; e.g. ripple 1658
+cycles vs gcc's 1926. That was before the optimisations above, which are emulator-checked and
+use only instructions the device has already run, but have not been on the device yet.
+The emulator's cycle model is fitted to device microbenchmarks but still overpredicts real
+stages (see `tool/hw_bench.dart --round2`). `NEG`'s flags, the 3-LERI forms and the
+DSP-extension instructions are unverified on the MDIN core and the compiler avoids them.
 
 Language differences from shader.py: `else` works (shader.py rejects it), and constants beyond
 the Q16 range are an error (shader.py hands C an unsigned literal, so comparisons with it turn

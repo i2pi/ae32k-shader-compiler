@@ -41,8 +41,12 @@ class CodeGen {
   var _scratch = false; // an inline sequence used R10-R13
   var _label = 0;
 
+  /// Fast mode: no saturation on q_mul / q_div and no zero-divisor test; results match
+  /// the reference evaluated with `fast: true` (lang/q16.dart qFast).
+  final bool fast;
+
   /// [regLocals]: how many locals get a register home (the rest live on the stack).
-  CodeGen(this.p, {int regLocals = 6}) {
+  CodeGen(this.p, {int regLocals = 6, this.fast = false}) {
     for (final l in p.locals) {
       if (_homes.length < regLocals) {
         _homes[l] = _alloc();
@@ -83,7 +87,7 @@ class CodeGen {
       ..writeln('    pop ${highs.join(',')}');
     if (lows.isNotEmpty) tail.writeln('    pop ${lows.join(',')}');
     tail.writeln('    pop %pc');
-    return '$head$_out$tail${runtimeFor(_calls)}';
+    return '$head$_out$tail${runtimeFor(_calls, fast: fast)}';
   }
 
   void _e(String s) => _out.writeln('    $s');
@@ -180,7 +184,7 @@ class CodeGen {
     }
   }
 
-  int _const(Expr e) => evaluate(Program([OutAssign(0, e)], const [], const [], const {}), const {})[0];
+  int _const(Expr e) => evaluate(Program([OutAssign(0, e)], const [], const [], const {}), const {}, null, fast)[0];
 
   /// Registers needed to evaluate [e] (Sethi-Ullman), so the hungrier operand goes first.
   int _need(Expr e) => switch (e) {
@@ -271,8 +275,27 @@ class CodeGen {
         if (b is Num && a is! Num) return _mulConst(a, b.q);
         return _runtime('__qmul', [l, r]);
       case '/':
+        final d = _fold(r);
+        if (d is Num && _pow2(d.q)) {
+          final v = _own(_expr(l));
+          _divPow2Reg(v.r, d.q);
+          return v;
+        }
         return _runtime('__qdiv', [l, r]);
       case '%':
+        final d = _fold(r);
+        if (d is Num && _pow2(d.q)) {
+          // a - q_mul(floor(q_div(a, c)), c), all inline
+          final v = _own(_expr(l));
+          final t = _alloc();
+          _e('lea (%R${v.r},0),%R$t');
+          _divPow2Reg(t, d.q);
+          _e('and -65536,%R$t');
+          _mulConstReg(t, d.q);
+          _e('sub %R$t,%R${v.r}');
+          _free.insert(0, t);
+          return v;
+        }
         return _runtime('__qmod', [l, r]);
       case '&&' || '||':
         final and = op == '&&';
@@ -309,6 +332,7 @@ class CodeGen {
   };
 
   _V _call(String fn, List<Expr> args) {
+    if (fn == 'mod') return _expr(Binary('%', args[0], args[1])); // same q_mod; inline for 2^m
     if (_runtimeFn.containsKey(fn)) return _runtime(_runtimeFn[fn]!, args);
     switch (fn) {
       case 'abs':
@@ -385,17 +409,30 @@ class CodeGen {
   }
 
   /// q_mul(x, c) inline for a constant c (q_mul is symmetric). Bit-exact with the C:
-  /// sign-magnitude product of the 16-bit halves, truncated, saturating.
+  /// sign-magnitude product of the 16-bit halves, truncated, saturating ([fast]: wrapping).
   _V _mulConst(Expr x, int c) {
+    final v = _own(_expr(x));
+    _mulConstReg(v.r, c);
+    return v;
+  }
+
+  /// R[r] = q_mul(R[r], c). Uses R9-R12.
+  void _mulConstReg(int r, int c) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;
     final ch = mag >> 16, cl = mag & 0xffff;
-    final v = _own(_expr(x));
     if (mag == 0) {
-      _e('ldi 0,%R${v.r}');
-      return v;
+      _e('ldi 0,%R$r');
+      return;
     }
     _scratch = true;
-    final r = v.r;
+    if (fast && cl == 0) {
+      // without saturation, q_mul by a whole number is the wrapping product
+      final d = r.isEven ? r : 10;
+      if (d != r) _e('lea (%R$r,0),%R$d');
+      _e('mul ${c ~/ 65536},%R$d');
+      if (d != r) _e('lea (%R$d,0),%R$r');
+      return;
+    }
     final lAbs = _newLabel(), lSat = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
     _e('lea (%R$r,0),%R9'); // x, for the sign
     _e('cmpq 0,%R$r');
@@ -418,8 +455,10 @@ class CodeGen {
       final t = (0x7fff + ch - 1) ~/ ch;
       _e('lea (%R$r,0),%R10');
       _e('lsr 16,%R10');
-      _e('cmp $t,%R10');
-      _e('jnc $lSat');
+      if (!fast) {
+        _e('cmp $t,%R10');
+        _e('jnc $lSat');
+      }
       if (cl == 0) {
         _e('lea (%R$r,0),%R10');
         _e('mul $ch,%R10');
@@ -437,18 +476,58 @@ class CodeGen {
         _e('add %R12,%R10'); // + al*ch
       }
     }
-    // r >= 0x7fffffff (unsigned) clamps to 0x7fffffff; only r >= 2^31 changes anything
-    _e('cmpq 0,%R10');
-    _e('jge $lSign');
-    _out.writeln('$lSat:');
-    _e('ldi 2147483647,%R10');
+    if (!fast) {
+      // r >= 0x7fffffff (unsigned) clamps to 0x7fffffff; only r >= 2^31 changes anything
+      _e('cmpq 0,%R10');
+      _e('jge $lSign');
+      _out.writeln('$lSat:');
+      _e('ldi 2147483647,%R10');
+    }
     _out.writeln('$lSign:');
     _e('cmpq 0,%R9');
     _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
     _e('neg %R10');
     _out.writeln('$lDone:');
     _e('lea (%R10,0),%R$r');
-    return v;
+  }
+
+  /// R[r] = q_div(R[r], c) for c = +-2^m: a shift of |x|, saturating at 0x7fffffff
+  /// when the quotient reaches 2^31. Uses R9, R10.
+  void _divPow2Reg(int r, int c) {
+    final mag = c < 0 ? (-c) & 0xffffffff : c;
+    final m = mag.bitLength - 1;
+    _scratch = true;
+    final lAbs = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
+    _e('lea (%R$r,0),%R9'); // x, for the sign
+    _e('cmpq 0,%R$r');
+    _e('jge $lAbs');
+    _e('neg %R$r');
+    _out.writeln('$lAbs:');
+    if (m > 16) {
+      _e('lsr ${m - 16},%R$r');
+    } else {
+      // |x| << (16 - m) >= 2^31 saturates: |x| >> (15 + m) != 0 (kept in fast mode: the
+      // q_div routine needs its saturation test to terminate, so fast q_div saturates too)
+      final lOk = _newLabel();
+      _e('lea (%R$r,0),%R10');
+      _e('lsr ${15 + m},%R10');
+      _e('cmpq 0,%R10');
+      _e('jz $lOk');
+      _e('ldi 2147483647,%R$r');
+      _e('jmp $lSign');
+      _out.writeln('$lOk:');
+      if (m < 16) _e('asl ${16 - m},%R$r');
+    }
+    _out.writeln('$lSign:');
+    _e('cmpq 0,%R9');
+    _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
+    _e('neg %R$r');
+    _out.writeln('$lDone:');
+  }
+
+  static bool _pow2(int c) {
+    final mag = c < 0 ? (-c) & 0xffffffff : c;
+    return mag != 0 && mag & (mag - 1) == 0;
   }
 
   /// Calls a runtime routine: arguments to R8.., result from R8 into a new temp.

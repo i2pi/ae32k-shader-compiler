@@ -26,14 +26,16 @@ class CompiledStage {
       ];
 }
 
-/// Compiles [source] for [slot] (0 warp, 1 scan, 2 vertex).
-CompiledStage compileStage(String source, {int slot = 0}) {
+/// Compiles [source] for [slot] (0 warp, 1 scan, 2 vertex). [fast] drops the saturation
+/// of q_mul / q_div and the zero-divisor test: overflow wraps instead of clamping, and
+/// x / 0 gives +-0x7fffffff instead of 0. Everything else is unchanged.
+CompiledStage compileStage(String source, {int slot = 0, bool fast = false}) {
   final Program prog = parse(source);
   // fewer register-resident locals when an expression runs out of registers
   String? asm;
   for (final homes in [6, 3, 0]) {
     try {
-      asm = CodeGen(prog, regLocals: homes).generate();
+      asm = CodeGen(prog, regLocals: homes, fast: fast).generate();
       break;
     } on CompileError catch (e) {
       if (homes == 0 || !e.message.contains('registers')) rethrow;

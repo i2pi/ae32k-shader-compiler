@@ -4,14 +4,13 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
-import 'package:ae32k_shader_compiler/src/abi.dart';
 import 'package:ae32k_shader_compiler/src/asm.dart';
 import 'package:ae32k_shader_compiler/src/emu.dart';
 
 void main(List<String> args) {
   String? opt(String n) => args.contains(n) ? args[args.indexOf(n) + 1] : null;
   final slot = int.parse(opt('--slot') ?? '0'), n = int.parse(opt('--n') ?? '200');
-  final st = compileStage(File(args.first).readAsStringSync(), slot: slot);
+  final st = compileStage(File(args.first).readAsStringSync(), slot: slot, fast: args.contains('--fast'));
   final labels = assemble(st.asm, slotAddr[slot]!).labels;
   // routine entry points (labels starting "__" without a further "_" suffix section)
   final entries = labels.entries.where((e) => RegExp(r'^__[a-z0-9]+$').hasMatch(e.key)).toList()
