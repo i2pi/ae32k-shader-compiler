@@ -8,7 +8,7 @@ it runs as a CLI and inside `scion_controller_app` on every Flutter platform.
 
 ```
 dart run bin/ae32k_shaderc.dart file.ss [--scan|--vert] [--asm] [--out f.bin] [--check N] [--osc --host IP --knobs a,b]
-dart compile exe bin/ae32k_shaderc.dart -o ae32k_shaderc     # a standalone binary (~1 s per stage, no Wine)
+dart compile exe bin/ae32k_shaderc.dart -o ae32k_shaderc     # a standalone binary (a stage compiles in well under a second, no Wine)
 ```
 
 Same slots, upload paths and packets as `tools/imcu/shader.py` (pinned by `test/osc_test.dart`).
