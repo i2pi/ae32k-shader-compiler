@@ -306,7 +306,7 @@ class CodeGen {
         final d = _fold(r);
         if (d is Num && _pow2(d.q)) {
           final v = _own(_expr(l));
-          _divPow2Reg(v.r, d.q);
+          _divPow2Reg(v.r, d.q, _range(l));
           return v;
         }
         return _runtime('__qdiv', [l, r]);
@@ -455,7 +455,8 @@ class CodeGen {
       return;
     }
     final nonNeg = xr != null && xr.nonNeg;
-    final noSat = fast || (xr != null && xr.mag * mag < (0x7fffffff - (1 << 17)) * 65536);
+    // |c| < 1.0: ah*cl + (al*cl >> 16) <= 2^31 * 65535/65536 < 2^31, so it never saturates
+    final noSat = fast || ch == 0 || (xr != null && xr.mag * mag < (0x7fffffff - (1 << 17)) * 65536);
     if (noSat && cl == 0) {
       // without saturation, q_mul by a whole number is the (wrapping) product
       final d = r.isEven ? r : 10;
@@ -585,18 +586,29 @@ class CodeGen {
 
   /// R[r] = q_div(R[r], c) for c = +-2^m: a shift of |x|, saturating at 0x7fffffff
   /// when the quotient reaches 2^31. Uses R9, R10.
-  void _divPow2Reg(int r, int c) {
+  void _divPow2Reg(int r, int c, [Range? xr]) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;
     final m = mag.bitLength - 1;
+    if (m > 16) {
+      // trunc(x / 2^k) = (x + (x < 0 ? 2^k - 1 : 0)) >> k (arithmetic), also for x = -2^31
+      final k = m - 16;
+      if (!(xr?.nonNeg ?? false)) {
+        _e('lea (%R$r,0),%R9');
+        _e('asr 31,%R9');
+        _e('lsr ${32 - k},%R9');
+        _e('add %R9,%R$r');
+      }
+      _e('asr $k,%R$r');
+      if (c < 0) _e('neg %R$r');
+      return;
+    }
     final lAbs = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
     _e('lea (%R$r,0),%R9'); // x, for the sign
     _e('cmpq 0,%R$r');
     _e('jge $lAbs');
     _e('neg %R$r');
     _out.writeln('$lAbs:');
-    if (m > 16) {
-      _e('lsr ${m - 16},%R$r');
-    } else {
+    {
       // |x| << (16 - m) >= 2^31 saturates: |x| >> (15 + m) != 0 (kept in fast mode: the
       // q_div routine needs its saturation test to terminate, so fast q_div saturates too)
       final lOk = _newLabel();
