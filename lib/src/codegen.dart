@@ -12,6 +12,7 @@ import 'abi.dart';
 import 'lang/ast.dart';
 import 'lang/eval.dart' show evaluate;
 import 'lang/q16.dart';
+import 'peephole.dart';
 import 'runtime.dart';
 
 class CompileError implements Exception {
@@ -46,7 +47,10 @@ class CodeGen {
   final bool fast;
 
   /// [regLocals]: how many locals get a register home (the rest live on the stack).
-  CodeGen(this.p, {int regLocals = 6, this.fast = false}) {
+  /// [copies]: keep the register copies (skip lib/src/peephole.dart), for comparison.
+  final bool copies;
+
+  CodeGen(this.p, {int regLocals = 6, this.fast = false, this.copies = false}) {
     for (final l in p.locals) {
       if (_homes.length < regLocals) {
         _homes[l] = _alloc();
@@ -87,7 +91,8 @@ class CodeGen {
       ..writeln('    pop ${highs.join(',')}');
     if (lows.isNotEmpty) tail.writeln('    pop ${lows.join(',')}');
     tail.writeln('    pop %pc');
-    return '$head$_out$tail${runtimeFor(_calls, fast: fast)}';
+    final stage = '$head$_out$tail';
+    return '${copies ? stage : removeCopies(stage)}${runtimeFor(_calls, fast: fast)}';
   }
 
   void _e(String s) => _out.writeln('    $s');

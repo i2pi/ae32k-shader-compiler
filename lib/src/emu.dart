@@ -5,6 +5,7 @@
 // Semantics from the ADChips quick reference (docs/); flag behaviour where the reference
 // is silent is marked. Instructions a stage never needs (coprocessor, debug, interrupts,
 // SIMD) raise [EmuError].
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'abi.dart';
@@ -25,11 +26,16 @@ class _Region {
   bool has(int a, int n) => a >= base && a + n <= base + data.lengthInBytes;
 }
 
-/// Cycle model, fitted to the device (tool/hw_bench.dart, 2026-10-11): one cycle per
-/// instruction, but fetch delivers two halfwords a cycle, so an instruction with its LERIs
-/// costs max(1, words/2); a taken branch or jump costs 1 more; a load whose result the next
-/// instruction reads stalls 1 cycle; data reads from ISPM cost 2 more; push/pop take one
-/// cycle per register. Instruction fetch from DSPM costs 3 cycles a word (datasheet).
+/// Cycle model, fitted to the device (tool/hw_bench.dart rounds 1 and 2, 2026-10-11):
+///  - one instruction (with its LERIs) per cycle, fed by a fetch of two halfwords a cycle
+///    with a small buffer: LERI+op alone costs 1, ldi32 back to back 1.5, nop + ldi32 2;
+///  - a taken forward branch or jump costs 1 more and empties the buffer; a taken backward
+///    branch costs nothing extra (a 3-instruction loop runs in 3 cycles); target alignment
+///    does not matter; jplr/jalr/pop %pc cost 1 more;
+///  - a load whose result the next instruction reads stalls 1 cycle, unless that is a store
+///    of the loaded value;
+///  - data reads from ISPM cost 2 more; push/pop one cycle per register.
+/// Instruction fetch from DSPM costs 3 cycles a word (datasheet; never used).
 class Cpu {
   static const ispm = 0x10000000, dspm = 0x20000000, spmSize = 0x10000;
   static const returnMagic = 0x0FFFFFF0; // LR on entry; reaching it ends the call
@@ -41,9 +47,8 @@ class Cpu {
   int _half = 0; // half-cycles
   int get cycles => (_half + 1) >> 1;
 
-  /// Whether a compare reading a just-loaded register stalls (hw_bench cannot yet tell; see
-  /// the c_delay note in docs/AE32000_ISA.md).
-  static bool cmpLoadUseStall = true;
+  static const _fetchBuffer = 2; // halfwords the fetch can run ahead (fits round 2)
+  int _buf = 0;
   /// Event counts behind [cycles], for fitting the model: taken branches/jumps, load-use
   /// stalls, ISPM data reads, extra push/pop registers, 1- 2- and 3-word instructions.
   final events = <String, int>{};
@@ -199,11 +204,14 @@ class Cpu {
     final d = _fetch();
     final i = d.insn;
     final next = pc + 2 * d.length;
-    _half += d.length > 2 ? d.length : 2;
+    final cost = d.length - _buf > 2 ? d.length - _buf : 2;
+    _half += cost;
+    _buf = min(_fetchBuffer, _buf + cost - d.length);
     _ev('w${d.length}');
     if (pc < dspm + spmSize && pc >= dspm) _half += 4 * d.length;
     final m = i.m;
-    if (_loaded != null && _reads(i).contains(_loaded) && (cmpLoadUseStall || (m != 'cmp' && m != 'cmpq'))) {
+    final storeData = const {'st', 'stb', 'sts'}.contains(m) && i.rd == _loaded && i.rb != _loaded;
+    if (_loaded != null && _reads(i).contains(_loaded) && !storeData) {
       _half += 2;
       _ev(m == 'cmp' || m == 'cmpq' ? 'stall_cmp' : 'stall');
     }
@@ -214,7 +222,8 @@ class Cpu {
       if (m == 'jal') lr = next;
       if (_cond(bi)) {
         npc = i.target!;
-        _half += 2;
+        _buf = 0;
+        if (i.target! > pc) _half += 2;
         _ev(i.target! < pc ? 'br_back' : 'br_fwd');
       }
       pc = npc;
@@ -342,6 +351,7 @@ class Cpu {
     }
     if (npc != next) {
       _half += 2; // taken jump (jr, jalr, jplr, pop %pc)
+      _buf = 0;
       _ev('jump');
     }
     pc = npc;
