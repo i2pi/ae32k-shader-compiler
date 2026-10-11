@@ -19,7 +19,10 @@ class AsmError implements Exception {
 class Assembled {
   final List<int> bytes;
   final Map<String, int> labels; // absolute addresses
-  const Assembled(this.bytes, this.labels);
+
+  /// Address of each instruction, by its 1-based line in the source text.
+  final Map<int, int> lineAddr;
+  const Assembled(this.bytes, this.labels, [this.lineAddr = const {}]);
 }
 
 class _Line {
@@ -65,6 +68,7 @@ Assembled assemble(String source, int base) {
     // encode
     var grew = false;
     final out = <int>[];
+    final lineAddr = <int, int>{};
     pc = base;
     for (final l in lines) {
       if (l.text.endsWith(':') && !l.text.contains(' ')) continue;
@@ -75,6 +79,7 @@ Assembled assemble(String source, int base) {
         continue;
       }
       final List<int> words;
+      lineAddr[l.lineNo] = pc;
       try {
         words = encode(_parseWithLabels(l.text, labels), pc);
       } on EncodeError catch (e) {
@@ -98,7 +103,7 @@ Assembled assemble(String source, int base) {
       }
       pc += 2 * words.length;
     }
-    if (!grew) return Assembled(out, labels);
+    if (!grew) return Assembled(out, labels, lineAddr);
   }
   throw AsmError('branch relaxation did not converge');
 }

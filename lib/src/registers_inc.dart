@@ -25,6 +25,16 @@ wmc_force_wr_y     0x0233 0x0180  7 raw    pixel   write controller: force luma 
 osd_box_x0         0x1059 0x1FFF  0 raw    pixel   OSD simple box start x (needs osd_box_en = 7)
 osd_box_x1         0x105A 0x1FFF  0 raw    partial OSD simple box end x (effect appears from the next pixel on the other side)
 
+# The rows above name single fields from the manual. The sweep established the REGISTER responds per pixel by
+# flipping whole bytes; which bit inside it does the work was not isolated. These rows write exactly the byte the
+# sweep flipped, so a stage using them reproduces the measured effect (value = the byte to xor in, e.g. 255).
+in_p0_ctl_lo       0x0100 0x00FF  0 raw    pixel   input port 0 control, low byte (cbcr_swap bit 3 + others), as swept
+in_p0_fid_lo       0x0101 0x00FF  0 raw    pixel   input port 0 field-id word, low byte, as swept
+in_p0_dtr_hi       0x0108 0xFF00  8 raw    pixel   input port 0 DTR demux word, high byte, as swept
+in_p0_mode_bits    0x010E 0x0101  0 raw    pixel   input port 0 mode word, bits 0 and 8, as swept (value 0x101)
+in_p0_port_lo      0x010F 0x00FF  0 raw    pixel   input port 0 mux port select, low byte, as swept
+wmc_ctl_hi         0x0233 0xFF00  8 raw    pixel   write controller control word, high byte (force-write and request bits), as swept
+
 # ---- partial: applied within the line where the picture shows it ----
 in_csc_c0          0x0600 0xFFFF  0 gain   partial input CSC coefficient 0 (Y row)
 in_csc_c1          0x0601 0xFFFF  0 gain   partial input CSC coefficient 1

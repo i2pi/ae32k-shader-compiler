@@ -49,27 +49,29 @@ class Call extends Expr {
 }
 
 sealed class Stmt {
-  const Stmt();
+  /// The source line the statement starts on (0 when built by hand).
+  final int line;
+  const Stmt({this.line = 0});
 }
 
 /// `let name = e;` or `name = e;`.
 class Assign extends Stmt {
   final String name;
   final Expr e;
-  const Assign(this.name, this.e);
+  const Assign(this.name, this.e, {super.line});
 }
 
 /// `out.name = e;`
 class OutAssign extends Stmt {
   final int slot;
   final Expr e;
-  const OutAssign(this.slot, this.e);
+  const OutAssign(this.slot, this.e, {super.line});
 }
 
 class If extends Stmt {
   final Expr cond;
   final List<Stmt> then, otherwise;
-  const If(this.cond, this.then, this.otherwise);
+  const If(this.cond, this.then, this.otherwise, {super.line});
 }
 
 /// One `@out name reg mask shift mode` line (scan stage).

@@ -115,7 +115,10 @@ class CodeGen {
     return '$head$code$tail${runtimeFor(_calls, fast: fast)}';
   }
 
-  void _e(String s) => _out.writeln('    $s');
+  // Every instruction carries `// @L<line>` for the statement it came from (lib/src/analysis.dart
+  // maps cycles back to source lines); the assembler ignores comments.
+  var _line = 0;
+  void _e(String s) => _out.writeln(_line > 0 ? '    $s  // @L$_line' : '    $s');
   String _newLabel() => '.L${_label++}';
 
   int _alloc() {
@@ -140,6 +143,13 @@ class CodeGen {
   // ---------------------------------------------------------------- statements
 
   void _stmt(Stmt s) {
+    final outer = _line;
+    if (s.line > 0) _line = s.line;
+    _stmtBody(s);
+    _line = outer;
+  }
+
+  void _stmtBody(Stmt s) {
     switch (s) {
       case Assign(:final name, :final e):
         final v = _expr(e);
@@ -159,6 +169,7 @@ class CodeGen {
         for (final t in then) {
           _stmt(t);
         }
+        _line = s.line > 0 ? s.line : _line;
         if (otherwise.isNotEmpty) _e('jmp $lEnd');
         _out.writeln('$lElse:');
         for (final t in otherwise) {

@@ -193,11 +193,22 @@ class Cpu {
   /// Half-cycles spent at each instruction address, when set (tool/profile.dart).
   Map<int, int>? profile;
 
+  /// Source-line attribution (lib/src/analysis.dart): [lineOf] maps every stage instruction's
+  /// address to its source line (0 for the prologue and epilogue); runtime routines are not in
+  /// it, so their cycles go to the line that called them. Half-cycles accumulate in [lineHalf].
+  Map<int, int>? lineOf;
+  Map<int, int>? lineHalf;
+  int _curLine = 0;
+
   void step() {
     final h0 = _half, pc0 = pc;
+    final lo = lineOf;
+    if (lo != null) _curLine = lo[pc0] ?? _curLine;
     _step();
     final p = profile;
     if (p != null) p[pc0] = (p[pc0] ?? 0) + _half - h0;
+    final lh = lineHalf;
+    if (lh != null) lh[_curLine] = (lh[_curLine] ?? 0) + _half - h0;
   }
 
   void _step() {
@@ -414,8 +425,12 @@ class StageRunner {
   }
 
   /// Runs the stage once. Returns the 16 outputs, and the cycle estimate in [stats].
-  List<int> run(Map<String, int> inputs, {List<int>? outInit, Map<String, int>? stats, Map<int, int>? profile}) {
-    final cpu = Cpu()..profile = profile;
+  List<int> run(Map<String, int> inputs,
+      {List<int>? outInit, Map<String, int>? stats, Map<int, int>? profile, Map<int, int>? lineOf, Map<int, int>? lineHalf}) {
+    final cpu = Cpu()
+      ..profile = profile
+      ..lineOf = lineOf
+      ..lineHalf = lineHalf;
     cpu.load(slotAddr[slot]!, blob);
     for (var k = 0; k < 256; k++) {
       cpu.write16(sinAddr + 2 * k, sin256[k]);

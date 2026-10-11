@@ -9,6 +9,8 @@ import 'src/lang/parser.dart';
 import 'src/registers.dart';
 
 export 'src/abi.dart' show slotAddr, maxBlobBytes;
+export 'src/analysis.dart' show analyzeStage, StageAnalysis, Diagnostic, LineCost, sampleInputs;
+export 'src/lang/highlight.dart' show highlight, Highlight, TokenKind;
 export 'src/codegen.dart' show CompileError;
 export 'src/lang/ast.dart' show OutMapEntry;
 export 'src/lang/parser.dart' show ShaderSyntaxError;
@@ -19,7 +21,11 @@ class CompiledStage {
   final List<int> bytes; // padded to a multiple of 4
   final String asm;
   final List<OutMapEntry> outMap;
-  const CompiledStage(this.slot, this.bytes, this.asm, this.outMap);
+
+  /// The source line of every stage instruction, by address (0 for the prologue and epilogue);
+  /// runtime routines are absent.
+  final Map<int, int> sourceLines;
+  const CompiledStage(this.slot, this.bytes, this.asm, this.outMap, [this.sourceLines = const {}]);
 
   /// Little-endian 32-bit words, as uploaded (`/send/1/shader/part`, `imcu hyb x`).
   List<int> get words => [
@@ -51,5 +57,12 @@ CompiledStage compileStage(String source, {int slot = 0, bool fast = false, Map<
   if (bytes.length > maxBlobBytes) {
     throw CompileError('stage is ${bytes.length} bytes; the upload limit is $maxBlobBytes');
   }
-  return CompiledStage(slot, bytes, asm, prog.outMap);
+  final asmLines = asm.split('\n');
+  final firstRoutine = asmLines.indexWhere((l) => RegExp(r'^__\w+:').hasMatch(l));
+  final tag = RegExp(r'// @L(\d+)');
+  final sourceLines = <int, int>{
+    for (final e in code.lineAddr.entries)
+      if (firstRoutine < 0 || e.key <= firstRoutine) e.value: int.parse(tag.firstMatch(asmLines[e.key - 1])?.group(1) ?? '0'),
+  };
+  return CompiledStage(slot, bytes, asm, prog.outMap, sourceLines);
 }
