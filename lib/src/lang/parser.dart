@@ -2,6 +2,8 @@
 // constant rounding and name rules) with one fix: `else` works as the language reference
 // documents (shader.py's accept() only matches operator tokens, so it rejects `else`).
 import '../abi.dart';
+import '../registers.dart' as reg_inc;
+import '../registers.dart' show Register;
 import 'ast.dart';
 
 class ShaderSyntaxError implements Exception {
@@ -69,9 +71,11 @@ List<_Tok> _lex(String src) {
 }
 
 /// Parses a stage. `@out` lines (scan stage) name output slots; those names take precedence
-/// over the built-in output names, as in shader.py.
-Program parse(String src) {
-  final (body, outMap, outNames) = _outMap(src);
+/// over the built-in output names, as in shader.py. An `@out` line is either
+/// `@out <output> <reg> <mask> <shift> <mode>` or `@out <output> <register name> [mode]`, the
+/// name a row of [registers] (default: tools/imcu/registers.inc as compiled in).
+Program parse(String src, {Map<String, Register>? registers}) {
+  final (body, outMap, outNames) = _outMap(src, registers ?? reg_inc.registers);
   final p = _Parser(_lex(body), {...outputSlot, ...outNames});
   final stmts = <Stmt>[];
   while (p.peek.k != _K.eof) {
@@ -81,24 +85,39 @@ Program parse(String src) {
 }
 
 final _outRe = RegExp(r'^\s*@out\s+(\w+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\w+)\s*;?\s*(//.*)?$');
+final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_]\w*)(?:\s+(\w+))?\s*;?\s*(//.*)?$');
 
-(String, List<OutMapEntry>, Map<String, int>) _outMap(String src) {
+(String, List<OutMapEntry>, Map<String, int>) _outMap(String src, Map<String, Register> registers) {
   final entries = <OutMapEntry>[];
   final names = <String, int>{};
   final kept = <String>[];
   final lines = src.split('\n');
   for (var i = 0; i < lines.length; i++) {
     final m = _outRe.firstMatch(lines[i]);
-    if (m == null) {
+    final mn = m == null ? _outNamedRe.firstMatch(lines[i]) : null;
+    if (m == null && mn == null) {
       kept.add(lines[i]);
       continue;
     }
     kept.add(''); // keep line numbers
-    final name = m.group(1)!, mode = m.group(5)!;
+    int n(String s) => s.startsWith('0x') || s.startsWith('0X') ? int.parse(s.substring(2), radix: 16) : int.parse(s);
+    final String name, mode;
+    final int reg, mask, shift;
+    if (m != null) {
+      (name, mode) = (m.group(1)!, m.group(5)!);
+      (reg, mask, shift) = (n(m.group(2)!), n(m.group(3)!), n(m.group(4)!));
+    } else {
+      // @out <output> <register name> [mode]: reg, mask, shift from the row, mode from the
+      // line or the row's default
+      name = mn!.group(1)!;
+      final r = registers[mn.group(2)!] ??
+          (throw ShaderSyntaxError('@out $name: unknown register name ${mn.group(2)} (see tools/imcu/registers.inc)', i + 1));
+      mode = mn.group(3) ?? r.mode;
+      (reg, mask, shift) = (r.reg, r.mask, r.shift);
+    }
     final modeN = outModes[mode] ?? (throw ShaderSyntaxError('@out $name: mode $mode? (raw gain add unit strobe)', i + 1));
     names.putIfAbsent(name, () => names.length);
-    int n(String s) => s.startsWith('0x') || s.startsWith('0X') ? int.parse(s.substring(2), radix: 16) : int.parse(s);
-    entries.add(OutMapEntry(n(m.group(2)!), n(m.group(3)!), n(m.group(4)!), modeN, names[name]!));
+    entries.add(OutMapEntry(reg, mask, shift, modeN, names[name]!));
   }
   if (names.length > 16) throw ShaderSyntaxError('more than 16 named outputs');
   return (kept.join('\n'), entries, names);

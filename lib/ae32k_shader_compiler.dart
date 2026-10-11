@@ -6,11 +6,13 @@ import 'src/asm.dart';
 import 'src/codegen.dart';
 import 'src/lang/ast.dart';
 import 'src/lang/parser.dart';
+import 'src/registers.dart';
 
 export 'src/abi.dart' show slotAddr, maxBlobBytes;
 export 'src/codegen.dart' show CompileError;
 export 'src/lang/ast.dart' show OutMapEntry;
 export 'src/lang/parser.dart' show ShaderSyntaxError;
+export 'src/registers.dart' show Register, parseRegisters, registers;
 
 class CompiledStage {
   final int slot;
@@ -29,8 +31,8 @@ class CompiledStage {
 /// Compiles [source] for [slot] (0 warp, 1 scan, 2 vertex). [fast] drops the saturation
 /// of q_mul / q_div and the zero-divisor test: overflow wraps instead of clamping, and
 /// x / 0 gives +-0x7fffffff instead of 0. Everything else is unchanged.
-CompiledStage compileStage(String source, {int slot = 0, bool fast = false}) {
-  final Program prog = parse(source);
+CompiledStage compileStage(String source, {int slot = 0, bool fast = false, Map<String, Register>? registers}) {
+  final Program prog = parse(source, registers: registers);
   // fewer register-resident locals when an expression runs out of registers
   String? asm;
   for (final homes in [6, 3, 0]) {

@@ -17,6 +17,7 @@ const usage = '''usage: ae32k_shaderc <file.ss> [options]
   --scan / --vert / --slot N   target slot (default 0, the warp stage)
   --asm                        print the generated assembly
   --out FILE                   write the blob (little-endian words, as uploaded)
+  --registers FILE             registers.inc for named @out lines (default: the copy compiled in)
   --fast                       no overflow saturation in * and /, no divide-by-zero test:
                                overflow wraps, x / 0 gives +-32767.99 (faster, smaller)
   --check N                    run N random evaluations in the emulator against the reference
@@ -51,7 +52,8 @@ Future<void> main(List<String> args) async {
   final src = File(file).readAsStringSync();
   final CompiledStage st;
   try {
-    st = compileStage(src, slot: slot, fast: fast);
+    final regs = opt('--registers');
+    st = compileStage(src, slot: slot, fast: fast, registers: regs == null ? null : parseRegisters(File(regs).readAsStringSync()));
   } on ShaderSyntaxError catch (e) {
     stderr.writeln('$file: $e');
     exit(1);
@@ -69,7 +71,7 @@ Future<void> main(List<String> args) async {
 
   final checks = int.tryParse(opt('--check') ?? '') ?? 0;
   if (checks > 0) {
-    final prog = parse(src);
+    final prog = parse(src, registers: opt('--registers') == null ? null : parseRegisters(File(opt('--registers')!).readAsStringSync()));
     final runner = StageRunner(st.bytes, slot: slot);
     final rng = Random(1);
     var worst = 0;
