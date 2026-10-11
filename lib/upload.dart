@@ -4,7 +4,6 @@ library;
 import 'dart:io';
 
 import 'ae32k_shader_compiler.dart';
-import 'src/osc.dart';
 
 /// Uploads [stage] the way `shader.py --osc` does: 1 KB parts to the slot's path (the
 /// device arms the stage only when the checksum matches), then knobs, then the scan map.

@@ -14,6 +14,7 @@ export 'src/lang/highlight.dart' show highlight, Highlight, TokenKind;
 export 'src/codegen.dart' show CompileError;
 export 'src/lang/ast.dart' show OutMapEntry;
 export 'src/lang/parser.dart' show ShaderSyntaxError;
+export 'src/osc.dart' show oscMessage, stageParts, knobMessage, scanMapMessage, slotPath;
 export 'src/registers.dart' show Register, parseRegisters, registers;
 
 class CompiledStage {
@@ -25,7 +26,10 @@ class CompiledStage {
   /// The source line of every stage instruction, by address (0 for the prologue and epilogue);
   /// runtime routines are absent.
   final Map<int, int> sourceLines;
-  const CompiledStage(this.slot, this.bytes, this.asm, this.outMap, [this.sourceLines = const {}]);
+
+  /// The address of the instruction on each line of [asm] (1-based), for listings.
+  final Map<int, int> asmAddr;
+  const CompiledStage(this.slot, this.bytes, this.asm, this.outMap, [this.sourceLines = const {}, this.asmAddr = const {}]);
 
   /// Little-endian 32-bit words, as uploaded (`/send/1/shader/part`, `imcu hyb x`).
   List<int> get words => [
@@ -64,5 +68,5 @@ CompiledStage compileStage(String source, {int slot = 0, bool fast = false, Map<
     for (final e in code.lineAddr.entries)
       if (firstRoutine < 0 || e.key <= firstRoutine) e.value: int.parse(tag.firstMatch(asmLines[e.key - 1])?.group(1) ?? '0'),
   };
-  return CompiledStage(slot, bytes, asm, prog.outMap, sourceLines);
+  return CompiledStage(slot, bytes, asm, prog.outMap, sourceLines, code.lineAddr);
 }

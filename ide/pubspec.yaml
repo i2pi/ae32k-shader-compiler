@@ -1,0 +1,32 @@
+name: shader_ide
+description: A small editor for Scion shader stages, with live compile errors, cycle costs per line and upload to a device.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ae32k_shader_compiler:
+    path: ..
+  file_selector: ^1.0.3
+  nsd: ^4.0.2
+  shared_preferences: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    # D-DIN (OFL, assets/fonts/D-DIN-LICENSE.txt), as in scion_controller_app
+    - family: DINPro
+      fonts:
+        - asset: assets/fonts/D-DIN-Regular.otf
+          weight: 400
+        - asset: assets/fonts/D-DIN-Bold.otf
+          weight: 700

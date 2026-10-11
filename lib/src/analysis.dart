@@ -37,7 +37,11 @@ class StageAnalysis {
   final Map<int, LineCost> lines;
   final double meanCycles;
   final int minCycles, maxCycles, samples;
-  const StageAnalysis(this.diagnostics, this.stage, this.lines, this.meanCycles, this.minCycles, this.maxCycles, this.samples);
+
+  /// Mean cycles per evaluation spent at each instruction address (stage and routines).
+  final Map<int, double> pcCycles;
+  const StageAnalysis(this.diagnostics, this.stage, this.lines, this.meanCycles, this.minCycles, this.maxCycles, this.samples,
+      [this.pcCycles = const {}]);
   bool get ok => stage != null;
 }
 
@@ -80,13 +84,13 @@ StageAnalysis analyzeStage(String source,
   }
   final runner = StageRunner(st.bytes, slot: slot);
   final rng = Random(1);
-  final half = <int, int>{}, ranIn = <int, int>{};
+  final half = <int, int>{}, ranIn = <int, int>{}, pcHalf = <int, int>{};
   var total = 0, lo = 1 << 30, hi = 0;
   for (var n = 0; n < samples; n++) {
     final inputs = sampleInputs(rng, slot, fixed);
     final lineHalf = <int, int>{}, stats = <String, int>{};
     try {
-      final got = runner.run(inputs, outInit: init, stats: stats, lineOf: st.sourceLines, lineHalf: lineHalf);
+      final got = runner.run(inputs, outInit: init, stats: stats, lineOf: st.sourceLines, lineHalf: lineHalf, profile: pcHalf);
       final want = evaluate(prog, inputs, init, fast);
       if (got.join(',') != want.join(',')) {
         diags.add(Diagnostic('internal: the native code disagrees with the reference for inputs $inputs'));
@@ -106,5 +110,6 @@ StageAnalysis analyzeStage(String source,
     hi = max(hi, c);
   }
   final lines = {for (final l in half.keys) l: LineCost(half[l]! / 2 / samples, ranIn[l]! / samples)};
-  return StageAnalysis(diags, st, lines, total / samples, samples == 0 ? 0 : lo, hi, samples);
+  final pcs = {for (final e in pcHalf.entries) e.key: e.value / 2 / samples};
+  return StageAnalysis(diags, st, lines, total / samples, samples == 0 ? 0 : lo, hi, samples, pcs);
 }

@@ -207,6 +207,16 @@ Language differences from shader.py:
 - Constants beyond the Q16 range are an error. shader.py hands C an unsigned literal, so
   comparisons with it turn unsigned.
 
+## Shader IDE
+
+[`ide/`](ide/README.md) is a small Flutter editor built on this package:
+- syntax highlighting, and errors underlined as you type;
+- each line's cycle cost in the gutter;
+- the generated assembly beside the source, with cycles per instruction;
+- upload to a SCION over OSC.
+
+It runs on macOS, Windows and Linux. The web build edits and measures, but cannot upload.
+
 ## How it is fast
 
 All of these keep results bit-exact (in `--fast` mode, bit-exact with the same C minus the
