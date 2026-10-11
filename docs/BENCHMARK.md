@@ -73,16 +73,16 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 
 ## Measured on the device
 
-From `docs/hw_bench_d0b55c9.log` (`tool/hw_bench.dart --stages`, so the native code of that run's commit), through
+From `docs/hw_bench_21de9da.log` (`tool/hw_bench.dart --stages`, so the native code of that run's commit), through
 the resident's `imcu hybrun a` hook, slot 0, one fixed
 input (x 960, y 540, t 1.0), call overhead subtracted. Only stages with a gcc blob for slot 0.
 
 | stage | gcc cyc | native cyc | fast cyc | speed-up | fast speed-up |
 |---|---:|---:|---:|---:|---:|
-| glitch | 2025 | 1107 | 957 | 1.83x | 2.12x |
+| glitch | 2025 | 1035 | 879 | 1.96x | 2.31x |
 | rand000 | 1981 | 570 | 568 | 3.47x | 3.49x |
-| rand001 | 1463 | 584 | 578 | 2.50x | 2.53x |
+| rand001 | 1463 | 636 | 630 | 2.30x | 2.32x |
 | rand002 | 1791 | 482 | 464 | 3.71x | 3.86x |
-| rand003 | 1617 | 913 | 893 | 1.77x | 1.81x |
+| rand003 | 1617 | 662 | 644 | 2.44x | 2.51x |
 | ripple | 1925 | 538 | 504 | 3.58x | 3.82x |
 
