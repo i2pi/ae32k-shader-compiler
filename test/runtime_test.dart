@@ -1,5 +1,5 @@
 // Each assembly runtime routine against its q16.dart reference, in the emulator, over
-// edge cases and random arguments; and the register convention (only R8-R10 change).
+// edge cases and random arguments; and the register convention (R0-R7 and R14 survive).
 import 'dart:math';
 
 import 'package:ae32k_shader_compiler/src/abi.dart';
@@ -32,14 +32,14 @@ class Harness {
     }
     cpu.write32(ctx + ctxSin, sinAt);
     cpu.stackPtr = Cpu.dspm + 0x10000;
-    for (final k in [0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13]) {
+    for (final k in [0, 1, 2, 3, 4, 5, 6, 7]) {
       cpu.r[k] = 0x5A5A0000 + k;
     }
     cpu.r[14] = ctx;
     if (args.length > 1) cpu.r[9] = args[1];
     if (args.length > 2) cpu.r[10] = args[2];
     final res = cpu.call(code.labels[entry]!, args[0]);
-    for (final k in [0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13]) {
+    for (final k in [0, 1, 2, 3, 4, 5, 6, 7]) {
       if (cpu.r[k] != 0x5A5A0000 + k) throw EmuError('$entry clobbered R$k');
     }
     if (cpu.r[14] != ctx) throw EmuError('$entry clobbered R14');

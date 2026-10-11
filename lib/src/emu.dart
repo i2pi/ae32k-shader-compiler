@@ -276,11 +276,13 @@ class Cpu {
       case 'nop' || 'sync':
         break;
       case 'push':
+        cycles += i.regs!.length - 1; // one memory access per register
         for (final reg in _order(i.regs!).reversed) {
           stackPtr = _s(stackPtr - 4);
           write32(stackPtr, _readReg(reg, next));
         }
       case 'pop':
+        cycles += i.regs!.length - 1;
         for (final reg in _order(i.regs!)) {
           final x = read32(stackPtr);
           stackPtr = _s(stackPtr + 4);

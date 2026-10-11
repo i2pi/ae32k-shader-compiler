@@ -2,8 +2,9 @@
 // shader.py compiles). Only routines a stage uses are linked in, with their dependencies.
 //
 // Convention (internal to a stage): arguments in R8, R9, R10; result in R8. A routine
-// may clobber R8-R10, MH/ML and the flags, and preserves every other register. R14
-// holds the ctx pointer (the sine table is read through it).
+// may clobber R8-R13, MH/ML and the flags (R11-R13 are scratch, so the hot routines need
+// no stack), and preserves R0-R7 and R14. R14 holds the ctx pointer (the sine table is
+// read through it). The stage saves R10-R13 once, since the gcc ABI has them callee-saved.
 //
 // Only instructions that gcc-built stages already execute on the device are used
 // (MUL low word, shifts, ALU, LDS, branches, PUSH/POP); MFMH, MIN/MAX/ABS and the other
@@ -19,9 +20,8 @@ const routines = <String, Routine>{
   // q_mul: sign-magnitude 16x16 split, saturating at +-0x7fffffff, as the C does.
   '__qmul': Routine('''
 __qmul:
-    push %R0,%R1,%R2,%R4
-    lea (%R8,0),%R10
-    xor %R9,%R10            // sign of the result in bit 31
+    lea (%R8,0),%R11
+    xor %R9,%R11            // sign of the result in bit 31
     cmpq 0,%R8
     jge __qmul_a
     neg %R8
@@ -30,37 +30,34 @@ __qmul_a:
     jge __qmul_b
     neg %R9
 __qmul_b:
-    lea (%R8,0),%R0
-    lsr 16,%R0              // ah
-    lea (%R9,0),%R2
-    lsr 16,%R2              // bh
-    lea (%R0,0),%R4
-    mul %R2,%R4             // hi = ah*bh
-    cmp 32767,%R4
+    lea (%R8,0),%R12
+    lsr 16,%R12             // ah
+    lea (%R12,0),%R13       // ah, kept
+    lea (%R9,0),%R10
+    lsr 16,%R10             // bh
+    mul %R10,%R12           // hi = ah*bh
+    cmp 32767,%R12
     jnc __qmul_sat          // hi >= 0x7fff
+    asl 16,%R12             // hi << 16
     and 65535,%R8           // al
     and 65535,%R9           // bl
-    asl 16,%R4              // hi << 16
-    mul %R9,%R0             // ah*bl
-    add %R0,%R4
-    lea (%R8,0),%R0
-    mul %R2,%R0             // al*bh
-    add %R0,%R4
+    mul %R8,%R10            // al*bh
+    add %R10,%R12
+    lea (%R13,0),%R10
+    mul %R9,%R10            // ah*bl
+    add %R10,%R12
     mul %R9,%R8             // al*bl
     lsr 16,%R8
-    add %R8,%R4             // r (mod 2^32, as the C)
+    add %R8,%R12            // r (mod 2^32, as the C)
     ldi 2147483647,%R8
-    cmp %R8,%R4
-    jc __qmul_r             // r < 0x7fffffff
-    lea (%R8,0),%R4
-__qmul_r:
-    lea (%R4,0),%R8
+    cmp %R8,%R12
+    jnc __qmul_sign         // r >= 0x7fffffff: R8 already holds the clamp
+    lea (%R12,0),%R8
 __qmul_sign:
-    cmpq 0,%R10
+    cmpq 0,%R11
     jge __qmul_ret
     neg %R8
 __qmul_ret:
-    pop %R0,%R1,%R2,%R4
     jplr
 __qmul_sat:
     ldi 2147483647,%R8
@@ -134,29 +131,27 @@ __qcos:
 ''', ['__qsin']),
   '__qsin': Routine('''
 __qsin:
-    push %R0,%R1,%R2
     ld (%R14,164),%R10      // ctx->sin256
-    lea (%R8,0),%R0
-    lsr 8,%R0
-    and 255,%R0             // i
+    lea (%R8,0),%R11
+    lsr 8,%R11
+    and 255,%R11            // i
     and 255,%R8             // f
-    lea (%R0,0),%R1
-    addq 1,%R1
-    and 255,%R1             // i + 1
-    add %R0,%R0
-    add %R10,%R0
-    lds (%R0,0),%R0         // s0
-    add %R1,%R1
-    add %R10,%R1
-    lds (%R1,0),%R2         // s1
-    ldi 256,%R1
-    sub %R8,%R1             // 256 - f
-    mul %R1,%R0
-    mul %R8,%R2
-    add %R2,%R0
-    asr 6,%R0
-    lea (%R0,0),%R8
-    pop %R0,%R1,%R2
+    lea (%R11,0),%R13
+    addq 1,%R13
+    and 255,%R13            // i + 1
+    add %R11,%R11
+    add %R10,%R11
+    lds (%R11,0),%R12       // s0
+    add %R13,%R13
+    add %R10,%R13
+    lds (%R13,0),%R10       // s1
+    ldi 256,%R11
+    sub %R8,%R11            // 256 - f
+    mul %R11,%R12
+    mul %R8,%R10
+    add %R10,%R12
+    asr 6,%R12
+    lea (%R12,0),%R8
     jplr
 '''),
 
@@ -414,14 +409,13 @@ __vh:                       // R8 = ix, R9 = iy -> 16-bit hash
 __qnoise:
     push %lr
     push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
-    push %R11,%R12
     lea (%R8,0),%R0
     asr 16,%R0              // ix
     lea (%R9,0),%R1
     asr 16,%R1              // iy
     and 65535,%R8           // fx
-    and 65535,%R9           // fy
-    lea (%R9,0),%R11        // fy
+    lea (%R9,0),%R7
+    and 65535,%R7           // fy (R7 is free until d)
     // sx = q_mul(q_mul(fx, fx), 3 - 2fx)
     lea (%R8,0),%R2
     lea (%R8,0),%R9
@@ -433,10 +427,10 @@ __qnoise:
     jal __qmul
     lea (%R8,0),%R2         // sx
     // sy
-    lea (%R11,0),%R8
-    lea (%R11,0),%R9
+    lea (%R7,0),%R8
+    lea (%R7,0),%R9
     jal __qmul
-    lea (%R11,0),%R9
+    lea (%R7,0),%R9
     add %R9,%R9
     neg %R9
     add 196608,%R9
@@ -467,8 +461,7 @@ __qnoise:
     sub %R4,%R8
     lea (%R2,0),%R9
     jal __qmul
-    add %R4,%R8
-    lea (%R8,0),%R12        // top
+    add %R8,%R4             // top
     // bot = c + q_mul(d - c, sx)
     lea (%R7,0),%R8
     sub %R6,%R8
@@ -476,11 +469,10 @@ __qnoise:
     jal __qmul
     add %R6,%R8             // bot
     // top + q_mul(bot - top, sy)
-    sub %R12,%R8
+    sub %R4,%R8
     lea (%R3,0),%R9
     jal __qmul
-    add %R12,%R8
-    pop %R11,%R12
+    add %R4,%R8
     pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
     pop %pc
 ''', ['__qmul', '__vh']),

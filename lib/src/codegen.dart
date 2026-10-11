@@ -2,10 +2,10 @@
 //
 // Stage layout: `int stage(struct ctx *c)` at the slot base (R8 = ctx on entry, 0 in R8
 // on return), followed by the runtime routines it uses (runtime.dart). Values live in
-// a register pool (R0-R7, R11-R13); the first locals get pool registers as their homes,
-// the rest stack slots. R14 holds ctx. Runtime calls take R8-R10 and preserve the pool,
-// so nothing is saved around them. Only pool registers actually used are saved, plus R14
-// and, when the runtime is called, R10 (callee-saved in the gcc ABI).
+// a register pool (R0-R7); the first locals get pool registers as their homes, the rest
+// stack slots. R14 holds ctx. Runtime calls and inline sequences use R8-R13 and preserve
+// the pool, so nothing is saved around them. The prologue saves the pool registers
+// actually used, R14, and R10-R13 when they are touched (callee-saved in the gcc ABI).
 import 'dart:math';
 
 import 'abi.dart';
@@ -21,7 +21,7 @@ class CompileError implements Exception {
   String toString() => 'CompileError: $message';
 }
 
-const _pool = [0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13];
+const _pool = [0, 1, 2, 3, 4, 5, 6, 7]; // R8-R13 are argument/scratch registers
 
 /// A value in a register; [temp] values may be overwritten, local homes may not.
 class _V {
@@ -38,6 +38,7 @@ class CodeGen {
   final _homes = <String, int>{}; // local -> register
   final _slots = <String, int>{}; // local -> stack offset
   final _calls = <String>{};
+  var _scratch = false; // an inline sequence used R10-R13
   var _label = 0;
 
   /// [regLocals]: how many locals get a register home (the rest live on the stack).
@@ -57,8 +58,7 @@ class CodeGen {
       _stmt(s);
     }
     final lows = [for (final r in _used.where((r) => r < 8).toList()..sort()) '%R$r'];
-    // R10 is callee-saved in the gcc ABI but the runtime's third argument register
-    final highs = [for (final r in [..._used.where((r) => r > 8), if (_calls.isNotEmpty) 10, 14]..sort()) '%R$r'];
+    final highs = [for (final r in [if (_calls.isNotEmpty || _scratch) ...[10, 11, 12, 13], 14]) '%R$r'];
     final frame = 4 * _slots.length;
     final head = StringBuffer()
       ..writeln('stage:')
@@ -266,6 +266,9 @@ class CodeGen {
         _release(b);
         return a;
       case '*':
+        final a = _fold(l), b = _fold(r);
+        if (a is Num && b is! Num) return _mulConst(b, a.q);
+        if (b is Num && a is! Num) return _mulConst(a, b.q);
         return _runtime('__qmul', [l, r]);
       case '/':
         return _runtime('__qdiv', [l, r]);
@@ -379,6 +382,64 @@ class CodeGen {
         return _expr(Binary('+', args[0], Binary('*', Binary('-', args[1], args[0]), args[2])));
     }
     throw CompileError('unknown function $fn');
+  }
+
+  /// q_mul(x, c) inline for a constant whose magnitude is below 1.0 or a whole number
+  /// (q_mul is symmetric); other constants call the routine. Bit-exact with the C:
+  /// sign-magnitude product of the 16-bit halves, truncated, saturating.
+  _V _mulConst(Expr x, int c) {
+    final mag = c < 0 ? (-c) & 0xffffffff : c;
+    final ch = mag >> 16, cl = mag & 0xffff;
+    if (ch != 0 && cl != 0) return _runtime('__qmul', [x, Num(c)]);
+    final v = _own(_expr(x));
+    if (mag == 0) {
+      _e('ldi 0,%R${v.r}');
+      return v;
+    }
+    _scratch = true;
+    final r = v.r;
+    final lAbs = _newLabel(), lClamp = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
+    _e('lea (%R$r,0),%R9'); // x, for the sign
+    _e('cmpq 0,%R$r');
+    _e('jge $lAbs');
+    _e('neg %R$r');
+    _out.writeln('$lAbs:');
+    if (ch == 0) {
+      // ah*cl + (al*cl >> 16)
+      _e('lea (%R$r,0),%R10');
+      _e('lsr 16,%R10');
+      _e('mul $cl,%R10');
+      _e('lea (%R$r,0),%R12');
+      _e('and 65535,%R12');
+      _e('mul $cl,%R12');
+      _e('lsr 16,%R12');
+      _e('add %R12,%R10');
+    } else {
+      // hi = ah*ch >= 0x7fff saturates; else |x|*ch (mod 2^32, as the C)
+      final t = (0x7fff + ch - 1) ~/ ch;
+      final lSat = _newLabel();
+      _e('lea (%R$r,0),%R10');
+      _e('lsr 16,%R10');
+      _e('cmp $t,%R10');
+      _e('jnc $lSat');
+      _e('lea (%R$r,0),%R10');
+      _e('mul $ch,%R10');
+      _e('jmp $lClamp');
+      _out.writeln('$lSat:');
+      _e('ldi 2147483647,%R10');
+    }
+    _out.writeln('$lClamp:');
+    _e('ldi 2147483647,%R12');
+    _e('cmp %R12,%R10');
+    _e('jc $lSign'); // below 0x7fffffff
+    _e('lea (%R12,0),%R10');
+    _out.writeln('$lSign:');
+    _e('cmpq 0,%R9');
+    _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
+    _e('neg %R10');
+    _out.writeln('$lDone:');
+    _e('lea (%R10,0),%R$r');
+    return v;
   }
 
   /// Calls a runtime routine: arguments to R8.., result from R8 into a new temp.
