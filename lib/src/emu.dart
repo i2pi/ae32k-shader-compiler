@@ -25,8 +25,11 @@ class _Region {
   bool has(int a, int n) => a >= base && a + n <= base + data.lengthInBytes;
 }
 
-/// Data reads from ISPM cost 3 cycles, instruction fetch from DSPM likewise (MIT's
-/// EmbeddedMCU datasheet); everything else is counted as one cycle per instruction word.
+/// Cycle model, fitted to the device (tool/hw_bench.dart, 2026-10-11): one cycle per
+/// instruction, but fetch delivers two halfwords a cycle, so an instruction with its LERIs
+/// costs max(1, words/2); a taken branch or jump costs 1 more; a load whose result the next
+/// instruction reads stalls 1 cycle; data reads from ISPM cost 2 more; push/pop take one
+/// cycle per register. Instruction fetch from DSPM costs 3 cycles a word (datasheet).
 class Cpu {
   static const ispm = 0x10000000, dspm = 0x20000000, spmSize = 0x10000;
   static const returnMagic = 0x0FFFFFF0; // LR on entry; reaching it ends the call
@@ -34,7 +37,18 @@ class Cpu {
   final r = Int32List(16);
   int stackPtr = 0, pc = 0, lr = 0, mh = 0, ml = 0;
   bool c = false, z = false, s = false, v = false;
-  int cycles = 0, insns = 0;
+  int insns = 0;
+  int _half = 0; // half-cycles
+  int get cycles => (_half + 1) >> 1;
+
+  /// Whether a compare reading a just-loaded register stalls (hw_bench cannot yet tell; see
+  /// the c_delay note in docs/AE32000_ISA.md).
+  static bool cmpLoadUseStall = true;
+  /// Event counts behind [cycles], for fitting the model: taken branches/jumps, load-use
+  /// stalls, ISPM data reads, extra push/pop registers, 1- 2- and 3-word instructions.
+  final events = <String, int>{};
+  void _ev(String k) => events[k] = (events[k] ?? 0) + 1;
+  int? _loaded; // register written by the previous instruction, if it was a load
   final _mem = [_Region(ispm, spmSize), _Region(dspm, spmSize)];
   final _decoded = <int, Decoded>{};
 
@@ -48,19 +62,28 @@ class Cpu {
   int read32(int a) {
     if (a & 3 != 0) throw EmuError('misaligned word read at 0x${a.toRadixString(16)}');
     final m = _at(a, 4);
-    if (m.base == ispm) cycles += 2;
+    if (m.base == ispm) {
+      _half += 4;
+      _ev('ispm_rd');
+    }
     return m.data.getInt32(a - m.base, Endian.little);
   }
 
   int read16(int a) {
     final m = _at(a, 2);
-    if (m.base == ispm) cycles += 2;
+    if (m.base == ispm) {
+      _half += 4;
+      _ev('ispm_rd');
+    }
     return m.data.getUint16(a - m.base, Endian.little);
   }
 
   int read8(int a) {
     final m = _at(a, 1);
-    if (m.base == ispm) cycles += 2;
+    if (m.base == ispm) {
+      _half += 4;
+      _ev('ispm_rd');
+    }
     return m.data.getUint8(a - m.base);
   }
 
@@ -166,14 +189,24 @@ class Cpu {
     final d = _fetch();
     final i = d.insn;
     final next = pc + 2 * d.length;
-    cycles += d.length;
-    if (pc < dspm + spmSize && pc >= dspm) cycles += 2 * d.length;
-    var npc = next;
+    _half += d.length > 2 ? d.length : 2;
+    _ev('w${d.length}');
+    if (pc < dspm + spmSize && pc >= dspm) _half += 4 * d.length;
     final m = i.m;
+    if (_loaded != null && _reads(i).contains(_loaded) && (cmpLoadUseStall || (m != 'cmp' && m != 'cmpq'))) {
+      _half += 2;
+      _ev(m == 'cmp' || m == 'cmpq' ? 'stall_cmp' : 'stall');
+    }
+    _loaded = const {'ld', 'ldb', 'ldbu', 'lds', 'ldsu'}.contains(m) ? i.rd : null;
+    var npc = next;
     final bi = branches.indexOf(m);
     if (bi >= 0) {
       if (m == 'jal') lr = next;
-      if (_cond(bi)) npc = i.target!;
+      if (_cond(bi)) {
+        npc = i.target!;
+        _half += 2;
+        _ev(i.target! < pc ? 'br_back' : 'br_fwd');
+      }
       pc = npc;
       return;
     }
@@ -276,13 +309,15 @@ class Cpu {
       case 'nop' || 'sync':
         break;
       case 'push':
-        cycles += i.regs!.length - 1; // one memory access per register
+        _half += 2 * (i.regs!.length - 1); // one memory access per register
+        events['pushpop_extra'] = (events['pushpop_extra'] ?? 0) + i.regs!.length - 1;
         for (final reg in _order(i.regs!).reversed) {
           stackPtr = _s(stackPtr - 4);
           write32(stackPtr, _readReg(reg, next));
         }
       case 'pop':
-        cycles += i.regs!.length - 1;
+        _half += 2 * (i.regs!.length - 1);
+        events['pushpop_extra'] = (events['pushpop_extra'] ?? 0) + i.regs!.length - 1;
         for (final reg in _order(i.regs!)) {
           final x = read32(stackPtr);
           stackPtr = _s(stackPtr + 4);
@@ -295,7 +330,21 @@ class Cpu {
       default:
         throw EmuError('unsupported instruction ${format(i)} at 0x${pc.toRadixString(16)}');
     }
+    if (npc != next) {
+      _half += 2; // taken jump (jr, jalr, jplr, pop %pc)
+      _ev('jump');
+    }
     pc = npc;
+  }
+
+  /// Registers [i] reads (for the load-use stall).
+  static Set<int> _reads(Insn i) {
+    const writeOnly = {'ldi', 'ld', 'ldb', 'ldbu', 'lds', 'ldsu', 'lea', 'mfmh', 'mfml'};
+    return {
+      if (i.rs != null) i.rs!,
+      if (i.rb != null) i.rb!,
+      if (i.rd != null && !writeOnly.contains(i.m)) i.rd!,
+    };
   }
 
   /// Push stores the highest-numbered register first, so the lowest ends at the lowest
@@ -370,6 +419,7 @@ class StageRunner {
     }
     if (cpu.stackPtr != stackTop) throw EmuError('stage returned with SP off by ${cpu.stackPtr - stackTop}');
     stats?['cycles'] = cpu.cycles;
+    stats?.addAll(cpu.events);
     stats?['insns'] = cpu.insns;
     return [for (var k = 0; k < 16; k++) cpu.read32(ctxAddr + ctxOut + 4 * k)];
   }

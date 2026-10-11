@@ -20,6 +20,7 @@ import 'package:ae32k_shader_compiler/src/emu.dart';
 import 'package:ae32k_shader_compiler/src/lang/eval.dart';
 import 'package:ae32k_shader_compiler/src/lang/parser.dart';
 import 'package:ae32k_shader_compiler/src/osc.dart';
+import 'package:ae32k_shader_compiler/src/runtime.dart';
 
 const slot = 0, base = 0x1000C000;
 const tickCycles = 4, maxRunCycles = 160000;
@@ -28,9 +29,40 @@ class Bench {
   final String name, setup, teardown;
   final String Function(int k) body;
   final int n1, n2;
-  final bool emulate;
-  const Bench(this.name, this.body, {this.setup = '', this.teardown = '', this.n1 = 64, this.n2 = 512, this.emulate = true});
+  final bool emulate, loop;
+  const Bench(this.name, this.body,
+      {this.setup = '', this.teardown = '', this.n1 = 64, this.n2 = 512, this.emulate = true, this.loop = false});
 }
+
+// Round 2 (--round2): round 1's branch and LERI costs did not add up on real stages (the
+// per-instruction model overpredicted them by 15-20%), so these separate fetch alignment,
+// loop branches, load-use into a compare, and time the runtime routines directly.
+const _flagsNz = 'ldi 0,%R9\n    cmpq 1,%R9';
+const _saveRt = 'push %lr\n    push %R10,%R11,%R12,%R13,%R14\n    lea (%R8,0),%R14';
+String _rt(String names) => 'pop %R10,%R11,%R12,%R13,%R14\n    pop %lr\n    jmp done\n${runtimeFor(names.split(','))}\ndone:';
+final benches2 = <Bench>[
+  Bench('jmp_al', (k) => 'jmp b$k\n    nop\nb$k:', setup: '.align 4', n2: 400),
+  Bench('jmp_mis', (k) => 'jmp b$k\n    nop\nb$k:', setup: '.align 4\n    nop', n2: 400),
+  Bench('jnz_skip_al', (k) => 'jnz b$k\n    nop\nb$k:', setup: '$_flagsNz\n    .align 4', n2: 400),
+  Bench('jnz_skip_mis', (k) => 'jnz b$k\n    nop\nb$k:', setup: '$_flagsNz\n    .align 4\n    nop', n2: 400),
+  Bench('leri_al', (k) => 'add 1000,%R9', setup: '.align 4'),
+  Bench('leri_mis', (k) => 'add 1000,%R9', setup: '.align 4\n    nop'),
+  Bench('nop_leri', (k) => 'nop\n    add 1000,%R9', n2: 400),
+  Bench('nop_ldi32', (k) => 'nop\n    ldi 0x12345678,%R9', n2: 300),
+  Bench('ld_cmp', (k) => 'ld (%R8,0),%R9\n    cmp %R9,%R9'),
+  Bench('ld_st', (k) => 'ld (%R8,0),%R9\n    st %R9,(%SP,0)', setup: 'lea (%SP,-8),%SP', teardown: 'lea (%SP,8),%SP'),
+  Bench('st_ld', (k) => 'st %R9,(%SP,0)\n    ld (%SP,0),%R9', setup: 'lea (%SP,-8),%SP', teardown: 'lea (%SP,8),%SP'),
+  // counted loops: the body count is the iteration count
+  Bench('loop3_al', (k) => '', setup: '.align 4', loop: true, n1: 50, n2: 2000),
+  Bench('loop3_mis', (k) => '', setup: '.align 4\n    nop', loop: true, n1: 50, n2: 2000),
+  Bench('loop5_al', (k) => 'nop\n    nop', setup: '.align 4', loop: true, n1: 50, n2: 2000),
+  // runtime routines with fixed arguments (body = ldi, ldi, jal)
+  Bench('rt_qmul', (k) => 'ldi 98304,%R8\n    ldi -147456,%R9\n    jal __qmul', setup: _saveRt, teardown: _rt('__qmul'), n1: 4, n2: 24),
+  Bench('rt_qdiv', (k) => 'ldi 196608,%R8\n    ldi 458752,%R9\n    jal __qdiv', setup: _saveRt, teardown: _rt('__qdiv'), n1: 2, n2: 12),
+  Bench('rt_qsin', (k) => 'ldi 19661,%R8\n    ldi 0,%R9\n    jal __qsin', setup: _saveRt, teardown: _rt('__qsin'), n1: 4, n2: 24),
+  Bench('rt_qsqrt', (k) => 'ldi 131072,%R8\n    ldi 0,%R9\n    jal __qsqrt', setup: _saveRt, teardown: _rt('__qsqrt'), n1: 2, n2: 12),
+  Bench('rt_qatan2', (k) => 'ldi 65536,%R8\n    ldi 131072,%R9\n    jal __qatan2', setup: _saveRt, teardown: _rt('__qatan2'), n1: 2, n2: 12),
+];
 
 final benches = <Bench>[
   Bench('nop', (k) => 'nop'),
@@ -78,6 +110,11 @@ String source(Bench b, int id, int n) {
     return s.toString();
   }
   if (b.setup.isNotEmpty) s.write('    ${b.setup}\n');
+  if (b.loop) {
+    final body = b.body(0);
+    s.write('    ldi $n,%R9\n    jmp l_top\n    .align 4\n${b.setup.endsWith('nop') ? '    nop\n' : ''}l_top:\n${body.isEmpty ? '' : '    $body\n'}    addq -1,%R9\n    cmpq 0,%R9\n    jnz l_top\n    jplr\n');
+    return s.toString();
+  }
   for (var k = 0; k < n; k++) {
     s.write('    ${b.body(k)}\n');
   }
@@ -149,7 +186,7 @@ Future<void> main(List<String> args) async {
   String? opt(String n) => args.contains(n) ? args[args.indexOf(n) + 1] : null;
   final dry = args.contains('--dry');
   final only = opt('--only')?.split(',');
-  final list = [...benches, if (args.contains('--local')) localBench].where((b) => only == null || only.contains(b.name)).toList();
+  final list = [...args.contains('--round2') ? benches2 : benches, if (args.contains('--local')) localBench].where((b) => only == null || only.contains(b.name)).toList();
   final dev = dry ? null : Device(opt('--host') ?? Platform.environment['SCION_IP'] ?? '192.168.100.221');
   await dev?.open();
   try {
