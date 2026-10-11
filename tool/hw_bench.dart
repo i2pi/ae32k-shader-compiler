@@ -1,7 +1,7 @@
 // Times code on the device with the resident's run-once hook (`imcu hybrun a <slot> <reps>`,
 // timer 0 = cpu/4 ticks) and compares it with the emulator.
 //
-//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages]
+//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages [--stage name,...]] [--round2]
 //
 // Microbenchmarks: each body is assembled at two repeat counts. The cost of one body is
 // d(ticks)*4 / (reps * dN), so the hook's call overhead and the blob's setup cancel. Every
@@ -185,7 +185,7 @@ class Device {
 Future<void> main(List<String> args) async {
   String? opt(String n) => args.contains(n) ? args[args.indexOf(n) + 1] : null;
   final dry = args.contains('--dry');
-  final only = opt('--only')?.split(',');
+  final only = opt('--only')?.split(','), stageOnly = opt('--stage')?.split(',');
   final list = [...args.contains('--round2') ? benches2 : benches, if (args.contains('--local')) localBench].where((b) => only == null || only.contains(b.name)).toList();
   final dev = dry ? null : Device(opt('--host') ?? Platform.environment['SCION_IP'] ?? '192.168.100.221');
   await dev?.open();
@@ -228,20 +228,34 @@ Future<void> main(List<String> args) async {
         print('\nempty stage: ${hwEmpty.toStringAsFixed(2)} cycles per rep on the device (emulator $emuEmpty); subtracted below');
       }
       print('\nstage                 emu cyc   hw cyc   out[0..7] vs reference (reps = 1)');
-      final ex = Directory('test/golden/gcc').listSync().whereType<File>().where((f) => f.path.endsWith('.ss')).toList()
-        ..sort((a, b) => a.path.compareTo(b.path));
+      // the gcc corpus (examples + rand000-003, with gcc's blobs for slot 0) and any newer
+      // tools/imcu/examples; native exact and fast builds of each
+      final ex = [
+        ...Directory('test/golden/gcc').listSync().whereType<File>().where((f) => f.path.endsWith('.ss')),
+      ];
+      final have = {for (final f in ex) f.uri.pathSegments.last};
+      final more = Directory('../../tools/imcu/examples');
+      if (more.existsSync()) {
+        ex.addAll(more.listSync().whereType<File>().where((f) => f.path.endsWith('.ss') && !have.contains(f.uri.pathSegments.last)));
+      }
+      ex.sort((a, b) => a.uri.pathSegments.last.compareTo(b.uri.pathSegments.last));
       final manifest = {
         for (final l in File('test/golden/gcc/manifest.txt').readAsLinesSync()) l.split('\t')[0]: int.parse(l.split('\t')[1]),
       };
       for (final f in ex) {
         final name = f.uri.pathSegments.last.replaceAll('.ss', '');
+        if (stageOnly != null && !stageOnly.contains(name)) continue;
         if (!name.startsWith('rand') || name.compareTo('rand004') < 0) {
           final src = f.readAsStringSync();
           final prog = parse(src);
-          final want = evaluate(prog, hookInputs, List.filled(16, 0)).sublist(0, 8);
-          final variants = <String, List<int>>{'native': compileStage(src, slot: slot).bytes};
-          if (manifest[name] == slot) variants['gcc'] = File('test/golden/gcc/$name.bin').readAsBytesSync();
-          for (final v in variants.entries) {
+          final variants = <String, (List<int>, bool)>{
+            'native': (compileStage(src, slot: slot).bytes, false),
+            'fast': (compileStage(src, slot: slot, fast: true).bytes, true),
+            if (manifest[name] == slot && f.path.contains('golden')) 'gcc': (File('test/golden/gcc/$name.bin').readAsBytesSync(), false),
+          };
+          for (final e in variants.entries) {
+            final v = MapEntry(e.key, e.value.$1);
+            final want = evaluate(prog, hookInputs, List.filled(16, 0), e.value.$2).sublist(0, 8);
             final st = <String, int>{};
             final got = StageRunner(v.value, slot: slot).run(hookInputs, stats: st).sublist(0, 8);
             final label = '$name/${v.key}'.padRight(20);

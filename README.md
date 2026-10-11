@@ -18,7 +18,7 @@ From Dart/Flutter: `compileStage(source, slot: n)` (pure Dart, any platform) and
 `--fast` (`compileStage(..., fast: true)`) drops the overflow handling: `*` wraps instead of
 saturating at +-32767.99, and `x / 0` gives +-32767.99 instead of 0. `/` still saturates (the
 division routine needs that test to terminate). Every other result is identical to the exact
-build. On the examples it is 5-55% faster and 15-60% smaller (emulator).
+build. On the examples it is 0-56% faster and 0-61% smaller (emulator).
 
 ## Optimisations
 
