@@ -48,6 +48,22 @@ void main() {
       checkProgram(f[0], File('${gcc.path}/${f[0]}.ss').readAsStringSync(), int.parse(f[1]), Random(f[0].hashCode));
     });
   }
+  test('q_mul by constants (inline) at edge inputs', () {
+    // constants with integer and fraction parts, around the saturation threshold of ah*ch
+    const consts = ['1.7', '-1.7', '3.1', '5.3', '0.7', '-0.25', '2', '-3', '100.5', '-1000.25', '32767.5', '1.0000153', '0'];
+    const xs = [0, 1, -1, 0xffff, 0x10000, -0x10000, 0x18000, 0x7fffffff, -0x7fffffff, -0x80000000, 0x7fff0000,
+      0x12345, -0x12345, 19 << 16, 20 << 16, 0x4b30000, 0x4b40000, 0x13ffff, 0x140000];
+    for (final c in consts) {
+      final src = 'out.dx = in.x * $c;\nout.dy = $c * in.y;';
+      final runner = StageRunner(compileStage(src).bytes);
+      final prog = parse(src);
+      for (final x in xs) {
+        final inputs = {'x': x, 'y': -x};
+        expect(runner.run(inputs).sublist(0, 2), evaluate(prog, inputs).sublist(0, 2), reason: 'x=$x c=$c');
+      }
+    }
+  });
+
   test('400 random programs', () {
     final rng = Random(20261011);
     final gen = RandomProgram(rng);

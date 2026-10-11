@@ -16,7 +16,7 @@ class Routine {
   const Routine(this.asm, [this.deps = const []]);
 }
 
-const routines = <String, Routine>{
+final routines = <String, Routine>{
   // q_mul: sign-magnitude 16x16 split, saturating at +-0x7fffffff, as the C does.
   '__qmul': Routine('''
 __qmul:
@@ -49,10 +49,10 @@ __qmul_b:
     mul %R9,%R8             // al*bl
     lsr 16,%R8
     add %R8,%R12            // r (mod 2^32, as the C)
-    ldi 2147483647,%R8
-    cmp %R8,%R12
-    jnc __qmul_sign         // r >= 0x7fffffff: R8 already holds the clamp
     lea (%R12,0),%R8
+    cmpq 0,%R8
+    jge __qmul_sign         // r >= 0x7fffffff clamps; only r >= 2^31 changes anything
+    ldi 2147483647,%R8
 __qmul_sign:
     cmpq 0,%R11
     jge __qmul_ret
@@ -64,64 +64,11 @@ __qmul_sat:
     jmp __qmul_sign
 '''),
 
-  // q_div: (a << 16) / b over a 48-bit numerator, one quotient bit per step, with the
-  // C's saturation quirks (remainder clamp, any quotient bit above 30 saturates).
-  '__qdiv': Routine('''
-__qdiv:
-    push %R0,%R1,%R2,%R3,%R5
-    lea (%R8,0),%R10
-    xor %R9,%R10
-    cmpq 0,%R8
-    jge __qdiv_a
-    neg %R8
-__qdiv_a:
-    cmpq 0,%R9
-    jge __qdiv_b
-    neg %R9
-__qdiv_b:
-    ldi 0,%R0               // q
-    cmpq 0,%R9
-    jz __qdiv_done          // b == 0: 0
-    ldi 0,%R1               // r
-    ldi 47,%R2              // i
-__qdiv_loop:
-    ldi 0,%R3               // the numerator bit
-    cmp 16,%R2
-    jc __qdiv_nobit         // i < 16: zeros below the binary point
-    add %R8,%R8             // next bit of |a| into C, most significant first
-    jnc __qdiv_nobit
-    ldi 1,%R3
-__qdiv_nobit:
-    cmpq 0,%R1
-    jge __qdiv_nosat
-    ldi 2147483647,%R1      // r had bit 31 set: unreachable (r < |b| <= 2^31 after every
-                            // step), kept only to mirror the C
-__qdiv_nosat:
-    add %R1,%R1
-    or %R3,%R1
-    cmp %R9,%R1
-    jc __qdiv_next          // r < |b|
-    sub %R9,%R1
-    cmp 31,%R2
-    jc __qdiv_low
-    ldi 2147483647,%R0      // a quotient bit at 31 or above
-    jmp __qdiv_next
-__qdiv_low:
-    ldi 1,%R5
-    asl %R2,%R5
-    or %R5,%R0
-__qdiv_next:
-    addq -1,%R2
-    jge __qdiv_loop
-__qdiv_done:
-    lea (%R0,0),%R8
-    cmpq 0,%R10
-    jge __qdiv_ret
-    neg %R8
-__qdiv_ret:
-    pop %R0,%R1,%R2,%R3,%R5
-    jplr
-'''),
+  // q_div: (|a| << 16) / |b| over a 48-bit numerator, saturating at 0x7fffffff, sign applied
+  // after (the C's bit loop; its remainder clamp is unreachable). Computed as the integer
+  // part |a| / |b| by shift-and-subtract (only when |a| >= |b|), then 16 fraction bits,
+  // unrolled. The result saturates exactly when the integer part reaches 2^15.
+  '__qdiv': Routine(_qdiv),
 
   // q_sin / q_cos: the resident's Q14 table, 256 entries per turn, linear interpolation.
   '__qcos': Routine('''
@@ -405,77 +352,11 @@ __vh:                       // R8 = ix, R9 = iy -> 16-bit hash
     and 65535,%R8
     jplr
 '''),
-  '__qnoise': Routine('''
-__qnoise:
-    push %lr
-    push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
-    lea (%R8,0),%R0
-    asr 16,%R0              // ix
-    lea (%R9,0),%R1
-    asr 16,%R1              // iy
-    and 65535,%R8           // fx
-    lea (%R9,0),%R7
-    and 65535,%R7           // fy (R7 is free until d)
-    // sx = q_mul(q_mul(fx, fx), 3 - 2fx)
-    lea (%R8,0),%R2
-    lea (%R8,0),%R9
-    jal __qmul
-    lea (%R2,0),%R9
-    add %R9,%R9
-    neg %R9
-    add 196608,%R9
-    jal __qmul
-    lea (%R8,0),%R2         // sx
-    // sy
-    lea (%R7,0),%R8
-    lea (%R7,0),%R9
-    jal __qmul
-    lea (%R7,0),%R9
-    add %R9,%R9
-    neg %R9
-    add 196608,%R9
-    jal __qmul
-    lea (%R8,0),%R3         // sy
-    lea (%R0,0),%R8
-    lea (%R1,0),%R9
-    jal __vh
-    lea (%R8,0),%R4         // a
-    lea (%R0,0),%R8
-    addq 1,%R8
-    lea (%R1,0),%R9
-    jal __vh
-    lea (%R8,0),%R5         // b
-    lea (%R0,0),%R8
-    lea (%R1,0),%R9
-    addq 1,%R9
-    jal __vh
-    lea (%R8,0),%R6         // c
-    lea (%R0,0),%R8
-    addq 1,%R8
-    lea (%R1,0),%R9
-    addq 1,%R9
-    jal __vh
-    lea (%R8,0),%R7         // d
-    // top = a + q_mul(b - a, sx)
-    lea (%R5,0),%R8
-    sub %R4,%R8
-    lea (%R2,0),%R9
-    jal __qmul
-    add %R8,%R4             // top
-    // bot = c + q_mul(d - c, sx)
-    lea (%R7,0),%R8
-    sub %R6,%R8
-    lea (%R2,0),%R9
-    jal __qmul
-    add %R6,%R8             // bot
-    // top + q_mul(bot - top, sy)
-    sub %R4,%R8
-    lea (%R3,0),%R9
-    jal __qmul
-    add %R4,%R8
-    pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
-    pop %pc
-''', ['__qmul', '__vh']),
+  // q_noise: the weights and lerps only ever multiply fractions, so each q_mul is one MUL:
+  // fx, fy in [0, 65535] make q_mul(fx, fx) = fx*fx >> 16 and the smoothstep weight
+  // s = m*bh + (m*bl >> 16) in [0, 65535] (checked for every fx); hashes are in [0, 65535],
+  // so a lerp step q_mul(d, s) with |d| < 65536 is +-(|d|*s >> 16). The hash is inlined.
+  '__qnoise': Routine(_qnoise),
 };
 
 /// The assembly for [names] and everything they depend on, each routine once.
@@ -493,3 +374,157 @@ String runtimeFor(Iterable<String> names) {
   }
   return [for (final n in routines.keys) if (want.contains(n)) routines[n]!.asm].join('\n');
 }
+
+final _qdiv = '''
+__qdiv:
+    lea (%R8,0),%R10
+    xor %R9,%R10            // sign of the result in bit 31
+    cmpq 0,%R8
+    jge __qdiv_a
+    neg %R8
+__qdiv_a:
+    cmpq 0,%R9
+    jge __qdiv_b
+    neg %R9
+__qdiv_b:
+    cmpq 0,%R9
+    jz __qdiv_zero          // b == 0: 0
+    ldi 0,%R11              // q
+    cmp %R9,%R8
+    jc __qdiv_frac          // |a| < |b|: no integer part
+    lea (%R8,0),%R13
+    lsr 15,%R13
+    cmp %R9,%R13
+    jnc __qdiv_sat          // |a| >> 15 >= |b|: the quotient reaches 2^31
+    lea (%R9,0),%R12        // d = |b| << s, the largest with d <= |a|
+    lea (%R8,0),%R13
+    lsr 1,%R13
+    cmp %R12,%R13
+    jc __qdiv_int
+__qdiv_norm:
+    add %R12,%R12
+    cmp %R12,%R13
+    jnc __qdiv_norm
+__qdiv_int:                 // integer bits, most significant first
+    add %R11,%R11
+    cmp %R12,%R8
+    jc __qdiv_int0
+    sub %R12,%R8
+    addq 1,%R11
+__qdiv_int0:
+    cmp %R9,%R12
+    jz __qdiv_frac
+    lsr 1,%R12
+    jmp __qdiv_int
+__qdiv_frac:                // 16 fraction bits; the remainder stays below |b| <= 2^31
+${[for (var k = 0; k < 16; k++) '    add %R8,%R8\n    add %R11,%R11\n    cmp %R9,%R8\n    jc __qdiv_f$k\n    sub %R9,%R8\n    addq 1,%R11\n__qdiv_f$k:'].join('\n')}
+__qdiv_sign:
+    lea (%R11,0),%R8
+    cmpq 0,%R10
+    jge __qdiv_ret
+    neg %R8
+__qdiv_ret:
+    jplr
+__qdiv_sat:
+    ldi 2147483647,%R11
+    jmp __qdiv_sign
+__qdiv_zero:
+    ldi 0,%R8
+    jplr
+''';
+
+// The __vh hash inline: R8 = ix, R9 = iy -> R8, clobbers R9, R10.
+const _vhInline = '''
+    mul 73856093,%R8
+    lea (%R9,0),%R10
+    mul 19349663,%R10
+    xor %R10,%R8
+    xor -1640531527,%R8
+    mul -1640531535,%R8
+    lea (%R8,0),%R9
+    lsr 15,%R9
+    xor %R9,%R8
+    mul -2048144777,%R8
+    lea (%R8,0),%R9
+    lsr 13,%R9
+    xor %R9,%R8
+    and 65535,%R8''';
+
+// q_mul(f, f) then q_mul(m, 3 - 2f) for a fraction f in R[f] (even): the weight into R[f].
+String _weight(int f) => '''
+    lea (%R$f,0),%R8
+    mul %R$f,%R$f
+    lsr 16,%R$f             // m = f*f >> 16
+    add %R8,%R8
+    neg %R8
+    add 196608,%R8          // 3 - 2f, in [1, 3]
+    lea (%R8,0),%R10
+    lsr 16,%R10             // bh
+    and 65535,%R8           // bl
+    mul %R$f,%R8
+    lsr 16,%R8              // m*bl >> 16
+    mul %R10,%R$f           // m*bh
+    add %R8,%R$f''';
+
+// R8 = +-(|R8| * R[s] >> 16), the lerp step.
+String _scale(int s, String l) => '''
+    cmpq 0,%R8
+    jge ${l}p
+    neg %R8
+    mul %R$s,%R8
+    lsr 16,%R8
+    neg %R8
+    jmp ${l}e
+${l}p:
+    mul %R$s,%R8
+    lsr 16,%R8
+${l}e:''';
+
+final _qnoise = '''
+__qnoise:
+    push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
+    lea (%R8,0),%R0
+    asr 16,%R0              // ix
+    lea (%R9,0),%R1
+    asr 16,%R1              // iy
+    lea (%R8,0),%R2
+    and 65535,%R2           // fx
+    lea (%R9,0),%R4
+    and 65535,%R4           // fy
+${_weight(2)}
+${_weight(4)}
+    lea (%R4,0),%R3         // sy
+    lea (%R0,0),%R8
+    lea (%R1,0),%R9
+$_vhInline
+    lea (%R8,0),%R4         // a
+    lea (%R0,0),%R8
+    addq 1,%R8
+    lea (%R1,0),%R9
+$_vhInline
+    lea (%R8,0),%R5         // b
+    lea (%R0,0),%R8
+    lea (%R1,0),%R9
+    addq 1,%R9
+$_vhInline
+    lea (%R8,0),%R6         // c
+    lea (%R0,0),%R8
+    addq 1,%R8
+    lea (%R1,0),%R9
+    addq 1,%R9
+$_vhInline
+    lea (%R8,0),%R7         // d
+    lea (%R5,0),%R8
+    sub %R4,%R8
+${_scale(2, '__qnoise_t')}
+    add %R8,%R4             // top = a + q_mul(b - a, sx)
+    lea (%R7,0),%R8
+    sub %R6,%R8
+${_scale(2, '__qnoise_b')}
+    add %R6,%R8             // bot = c + q_mul(d - c, sx)
+    sub %R4,%R8
+${_scale(3, '__qnoise_f')}
+    add %R4,%R8             // top + q_mul(bot - top, sy)
+    pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
+    jplr
+''';

@@ -185,7 +185,17 @@ class Cpu {
     }
   }
 
+  /// Half-cycles spent at each instruction address, when set (tool/profile.dart).
+  Map<int, int>? profile;
+
   void step() {
+    final h0 = _half, pc0 = pc;
+    _step();
+    final p = profile;
+    if (p != null) p[pc0] = (p[pc0] ?? 0) + _half - h0;
+  }
+
+  void _step() {
     final d = _fetch();
     final i = d.insn;
     final next = pc + 2 * d.length;
@@ -394,8 +404,8 @@ class StageRunner {
   }
 
   /// Runs the stage once. Returns the 16 outputs, and the cycle estimate in [stats].
-  List<int> run(Map<String, int> inputs, {List<int>? outInit, Map<String, int>? stats}) {
-    final cpu = Cpu();
+  List<int> run(Map<String, int> inputs, {List<int>? outInit, Map<String, int>? stats, Map<int, int>? profile}) {
+    final cpu = Cpu()..profile = profile;
     cpu.load(slotAddr[slot]!, blob);
     for (var k = 0; k < 256; k++) {
       cpu.write16(sinAddr + 2 * k, sin256[k]);

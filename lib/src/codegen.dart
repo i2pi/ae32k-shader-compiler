@@ -384,13 +384,11 @@ class CodeGen {
     throw CompileError('unknown function $fn');
   }
 
-  /// q_mul(x, c) inline for a constant whose magnitude is below 1.0 or a whole number
-  /// (q_mul is symmetric); other constants call the routine. Bit-exact with the C:
+  /// q_mul(x, c) inline for a constant c (q_mul is symmetric). Bit-exact with the C:
   /// sign-magnitude product of the 16-bit halves, truncated, saturating.
   _V _mulConst(Expr x, int c) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;
     final ch = mag >> 16, cl = mag & 0xffff;
-    if (ch != 0 && cl != 0) return _runtime('__qmul', [x, Num(c)]);
     final v = _own(_expr(x));
     if (mag == 0) {
       _e('ldi 0,%R${v.r}');
@@ -398,7 +396,7 @@ class CodeGen {
     }
     _scratch = true;
     final r = v.r;
-    final lAbs = _newLabel(), lClamp = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
+    final lAbs = _newLabel(), lSat = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
     _e('lea (%R$r,0),%R9'); // x, for the sign
     _e('cmpq 0,%R$r');
     _e('jge $lAbs');
@@ -415,24 +413,35 @@ class CodeGen {
       _e('lsr 16,%R12');
       _e('add %R12,%R10');
     } else {
-      // hi = ah*ch >= 0x7fff saturates; else |x|*ch (mod 2^32, as the C)
+      // hi = ah*ch >= 0x7fff saturates; else (hi << 16) + ah*cl + al*ch + (al*cl >> 16)
+      // mod 2^32, as the C. With cl == 0 that is |x|*ch; otherwise ah*|c| + al*ch + ...
       final t = (0x7fff + ch - 1) ~/ ch;
-      final lSat = _newLabel();
       _e('lea (%R$r,0),%R10');
       _e('lsr 16,%R10');
       _e('cmp $t,%R10');
       _e('jnc $lSat');
-      _e('lea (%R$r,0),%R10');
-      _e('mul $ch,%R10');
-      _e('jmp $lClamp');
-      _out.writeln('$lSat:');
-      _e('ldi 2147483647,%R10');
+      if (cl == 0) {
+        _e('lea (%R$r,0),%R10');
+        _e('mul $ch,%R10');
+      } else {
+        _e('ldi $mag,%R11');
+        _e('mul %R11,%R10'); // ah*|c| = (ah*ch << 16) + ah*cl
+        _e('lea (%R$r,0),%R12');
+        _e('and 65535,%R12');
+        _e('mul $cl,%R12');
+        _e('lsr 16,%R12');
+        _e('add %R12,%R10'); // + al*cl >> 16
+        _e('lea (%R$r,0),%R12');
+        _e('and 65535,%R12');
+        _e('mul $ch,%R12');
+        _e('add %R12,%R10'); // + al*ch
+      }
     }
-    _out.writeln('$lClamp:');
-    _e('ldi 2147483647,%R12');
-    _e('cmp %R12,%R10');
-    _e('jc $lSign'); // below 0x7fffffff
-    _e('lea (%R12,0),%R10');
+    // r >= 0x7fffffff (unsigned) clamps to 0x7fffffff; only r >= 2^31 changes anything
+    _e('cmpq 0,%R10');
+    _e('jge $lSign');
+    _out.writeln('$lSat:');
+    _e('ldi 2147483647,%R10');
     _out.writeln('$lSign:');
     _e('cmpq 0,%R9');
     _e('${c < 0 ? 'jlt' : 'jge'} $lDone');

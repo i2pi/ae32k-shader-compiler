@@ -72,6 +72,23 @@ void check(String entry, int arity, int Function(List<int>) ref, {int random = 3
 void main() {
   check('__qmul', 2, (a) => qMul(a[0], a[1]));
   check('__qdiv', 2, (a) => qDiv(a[0], a[1]), random: 1500);
+  test('__qdiv at the saturation boundary and exact multiples', () {
+    // |a| = |b| << 15 is where the quotient reaches 2^31; |a| = k|b| +- 1 flips integer bits.
+    final h = Harness('__qdiv');
+    final rng = Random(7);
+    for (var n = 0; n < 3000; n++) {
+      final b = 1 + rng.nextInt(1 << (1 + rng.nextInt(31)));
+      final k = rng.nextBool() ? 1 << 15 : 1 + rng.nextInt(1 << (1 + rng.nextInt(15)));
+      for (final d in [-1, 0, 1]) {
+        final ua = b * k + d;
+        if (ua < 0 || ua > 0x80000000) continue;
+        for (final (sa, sb) in [(1, 1), (-1, 1), (1, -1), (-1, -1)]) {
+          final a = (sa * ua).toSigned(32), bb = (sb * b).toSigned(32);
+          expect(h.call([a, bb]), qDiv(a, bb), reason: 'q_div($a, $bb)');
+        }
+      }
+    }
+  });
   check('__qsin', 1, (a) => qSin(a[0]));
   check('__qcos', 1, (a) => qCos(a[0]));
   check('__qsqrt', 1, (a) => qSqrt(a[0]));
