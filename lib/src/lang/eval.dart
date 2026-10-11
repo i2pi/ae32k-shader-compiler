@@ -5,21 +5,25 @@ import 'q16.dart';
 
 /// Inputs by name (abi.dart ctxInput) and the 16 outputs as the resident left them
 /// (zero, or 1.0 for `gain` map entries). Returns the outputs after the stage ran.
-List<int> evaluate(Program p, Map<String, int> inputs, [List<int>? outInit, bool fast = false]) {
+///
+/// [observe] sees every expression evaluated, with its value (for checking range analysis).
+List<int> evaluate(Program p, Map<String, int> inputs,
+    [List<int>? outInit, bool fast = false, void Function(Expr e, int value)? observe]) {
   final was = qFast;
   qFast = fast;
   try {
-    return _evaluate(p, inputs, outInit);
+    return _evaluate(p, inputs, outInit, observe);
   } finally {
     qFast = was;
   }
 }
 
-List<int> _evaluate(Program p, Map<String, int> inputs, List<int>? outInit) {
+List<int> _evaluate(Program p, Map<String, int> inputs, List<int>? outInit, void Function(Expr, int)? observe) {
   final out = List<int>.of(outInit ?? List.filled(16, 0));
   final env = {for (final l in p.locals) l: 0};
 
-  int ev(Expr e) => switch (e) {
+  late final int Function(Expr) ev;
+  int ev0(Expr e) => switch (e) {
         Num(:final q) => q,
         In(:final name) => i32(inputs[name] ?? 0),
         OutRead(:final slot) => out[slot],
@@ -29,6 +33,13 @@ List<int> _evaluate(Program p, Map<String, int> inputs, List<int>? outInit) {
         Call(:final fn, :final args) => callQ(fn, [for (final a in args) ev(a)]),
         Binary(:final op, :final l, :final r) => _bin(op, l, r, ev),
       };
+  ev = observe == null
+      ? ev0
+      : (e) {
+          final v = ev0(e);
+          observe(e, v);
+          return v;
+        };
 
   void run(List<Stmt> body) {
     for (final s in body) {

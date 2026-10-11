@@ -13,6 +13,7 @@ import 'lang/ast.dart';
 import 'lang/eval.dart' show evaluate;
 import 'lang/q16.dart';
 import 'peephole.dart';
+import 'ranges.dart';
 import 'runtime.dart';
 
 class CompileError implements Exception {
@@ -44,6 +45,9 @@ class CodeGen {
   /// Fast mode: no saturation on q_mul / q_div and no zero-divisor test; results match
   /// the reference evaluated with `fast: true` (lang/q16.dart qFast).
   final bool fast;
+
+  late final Map<String, Range?> _ranges = localRanges(p);
+  Range? _range(Expr e) => rangeOf(_fold(e), _ranges);
 
   /// [regLocals]: how many locals get a register home (the rest live on the stack).
   /// [copies]: keep the register copies (skip lib/src/peephole.dart), for comparison.
@@ -294,6 +298,9 @@ class CodeGen {
         final a = _fold(l), b = _fold(r);
         if (a is Num && b is! Num) return _mulConst(b, a.q);
         if (b is Num && a is! Num) return _mulConst(a, b.q);
+        final ra = _range(a), rb = _range(b);
+        if (rb != null && rb.within(-q1, q1)) return _mulSmall(a, b, rb, ra);
+        if (ra != null && ra.within(-q1, q1)) return _mulSmall(b, a, ra, rb);
         return _runtime('__qmul', [l, r]);
       case '/':
         final d = _fold(r);
@@ -433,20 +440,24 @@ class CodeGen {
   /// sign-magnitude product of the 16-bit halves, truncated, saturating ([fast]: wrapping).
   _V _mulConst(Expr x, int c) {
     final v = _own(_expr(x));
-    _mulConstReg(v.r, c);
+    _mulConstReg(v.r, c, _range(x));
     return v;
   }
 
-  /// R[r] = q_mul(R[r], c). Uses R9-R12.
-  void _mulConstReg(int r, int c) {
+  /// R[r] = q_mul(R[r], c), where R[r] is known to lie in [xr] (null: anything). The sign
+  /// handling goes when x >= 0, the saturation tests when |x|*|c| stays inside 32 bits.
+  /// Uses R9-R12.
+  void _mulConstReg(int r, int c, [Range? xr]) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;
     final ch = mag >> 16, cl = mag & 0xffff;
     if (mag == 0) {
       _e('ldi 0,%R$r');
       return;
     }
-    if (fast && cl == 0) {
-      // without saturation, q_mul by a whole number is the wrapping product
+    final nonNeg = xr != null && xr.nonNeg;
+    final noSat = fast || (xr != null && xr.mag * mag < (0x7fffffff - (1 << 17)) * 65536);
+    if (noSat && cl == 0) {
+      // without saturation, q_mul by a whole number is the (wrapping) product
       final d = r.isEven ? r : 10;
       if (d != r) _e('lea (%R$r,0),%R$d');
       _e('mul ${c ~/ 65536},%R$d');
@@ -454,11 +465,13 @@ class CodeGen {
       return;
     }
     final lAbs = _newLabel(), lSat = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
-    _e('lea (%R$r,0),%R9'); // x, for the sign
-    _e('cmpq 0,%R$r');
-    _e('jge $lAbs');
-    _e('neg %R$r');
-    _out.writeln('$lAbs:');
+    if (!nonNeg) {
+      _e('lea (%R$r,0),%R9'); // x, for the sign
+      _e('cmpq 0,%R$r');
+      _e('jge $lAbs');
+      _e('neg %R$r');
+      _out.writeln('$lAbs:');
+    }
     if (ch == 0) {
       // ah*cl + (al*cl >> 16)
       _e('lea (%R$r,0),%R10');
@@ -475,7 +488,7 @@ class CodeGen {
       final t = (0x7fff + ch - 1) ~/ ch;
       _e('lea (%R$r,0),%R10');
       _e('lsr 16,%R10');
-      if (!fast) {
+      if (!noSat) {
         _e('cmp $t,%R10');
         _e('jnc $lSat');
       }
@@ -496,7 +509,7 @@ class CodeGen {
         _e('add %R12,%R10'); // + al*ch
       }
     }
-    if (!fast) {
+    if (!noSat) {
       // r >= 0x7fffffff (unsigned) clamps to 0x7fffffff; only r >= 2^31 changes anything
       _e('cmpq 0,%R10');
       _e('jge $lSign');
@@ -504,11 +517,70 @@ class CodeGen {
       _e('ldi 2147483647,%R10');
     }
     _out.writeln('$lSign:');
-    _e('cmpq 0,%R9');
-    _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
-    _e('neg %R10');
+    if (!nonNeg) {
+      _e('cmpq 0,%R9');
+      _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
+      _e('neg %R10');
+    } else if (c < 0) {
+      _e('neg %R10');
+    }
     _out.writeln('$lDone:');
     _e('lea (%R10,0),%R$r');
+  }
+
+  /// q_mul(x, f) inline for |f| <= 1.0 (f in [fr], x in [xr] or anything): bh is 0, or 1 with
+  /// bl == 0, so the product is ah*|f| + (al*|f| >> 16); it saturates only for |f| == 1.0
+  /// and |x| >= 0x7fff0000. Uses R9-R12.
+  _V _mulSmall(Expr x, Expr f, Range fr, Range? xr) {
+    final ab = _exprs([x, f]);
+    final v = _own(ab[0]), w = _own(ab[1]);
+    final xNon = xr != null && xr.nonNeg, fNon = fr.nonNeg;
+    if (!(xNon && fNon)) {
+      _e('lea (%R${v.r},0),%R9');
+      _e('xor %R${w.r},%R9'); // the sign of the result in bit 31
+    }
+    if (!xNon) {
+      final l = _newLabel();
+      _e('cmpq 0,%R${v.r}');
+      _e('jge $l');
+      _e('neg %R${v.r}');
+      _out.writeln('$l:');
+    }
+    if (!fNon) {
+      final l = _newLabel();
+      _e('cmpq 0,%R${w.r}');
+      _e('jge $l');
+      _e('neg %R${w.r}');
+      _out.writeln('$l:');
+    }
+    _e('lea (%R${v.r},0),%R10');
+    _e('lsr 16,%R10');
+    _e('mul %R${w.r},%R10'); // ah*|f|
+    _e('lea (%R${v.r},0),%R12');
+    _e('and 65535,%R12');
+    _e('mul %R${w.r},%R12');
+    _e('lsr 16,%R12');
+    _e('add %R12,%R10'); // + al*|f| >> 16
+    if (!fast && fr.mag >= q1 && (xr == null || xr.mag >= 0x7fff0000)) {
+      final l = _newLabel();
+      _e('ldi 2147418112,%R11'); // 0x7fff0000
+      _e('cmp %R11,%R10');
+      _e('jc $l');
+      _e('cmp 65536,%R${w.r}');
+      _e('jnz $l');
+      _e('ldi 2147483647,%R10'); // |f| == 1.0 and ah >= 0x7fff: saturated
+      _out.writeln('$l:');
+    }
+    if (!(xNon && fNon)) {
+      final l = _newLabel();
+      _e('cmpq 0,%R9');
+      _e('jge $l');
+      _e('neg %R10');
+      _out.writeln('$l:');
+    }
+    _e('lea (%R10,0),%R${v.r}');
+    _release(w);
+    return v;
   }
 
   /// R[r] = q_div(R[r], c) for c = +-2^m: a shift of |x|, saturating at 0x7fffffff
