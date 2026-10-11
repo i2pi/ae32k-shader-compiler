@@ -98,6 +98,9 @@ int emuCycles(List<int> blob) {
   return st['cycles']!;
 }
 
+/// The device arms len/4 words: pad, or the tail (the final jplr) is lost.
+List<int> pad4(List<int> b) => [...b, ...List.filled(-b.length % 4 & 3, 0)];
+
 int repsFor(int cycles) => (maxRunCycles ~/ (cycles * 2 + 200)).clamp(1, 20000);
 
 class Device {
@@ -127,7 +130,7 @@ class Device {
     _buf.clear();
     _tel.write('imcu hybrun a $slot ${reps.toRadixString(16)}\r\n');
     final end = DateTime.now().add(const Duration(seconds: 7));
-    final re = RegExp(r"= ([0-9A-Fa-f]+(?: [0-9A-Fa-f]+)*)");
+    final re = RegExp(r"'= ([0-9A-Fa-f]+(?: [0-9A-Fa-f]+)+)'");
     while (DateTime.now().isBefore(end)) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       final m = re.firstMatch(_buf.toString());
@@ -165,7 +168,7 @@ Future<void> main(List<String> args) async {
 
     print('${'bench'.padRight(14)} ${'emu/body'.padLeft(9)} ${'hw/body'.padLeft(9)}   (hw ticks n1, n2; reps)');
     for (final b in list) {
-      final blobs = [for (final n in [b.n1, b.n2]) assemble(source(b, id + (n == b.n1 ? 0 : 1), n), base).bytes];
+      final blobs = [for (final n in [b.n1, b.n2]) pad4(assemble(source(b, id + (n == b.n1 ? 0 : 1), n), base).bytes)];
       final emu = b.emulate ? [for (final bl in blobs) emuCycles(bl)] : null;
       final reps = repsFor(emu?.last ?? 40 * b.n2);
       final emuPer = emu == null ? null : (emu[1] - emu[0]) / (b.n2 - b.n1);
@@ -178,7 +181,7 @@ Future<void> main(List<String> args) async {
 
     if (args.contains('--stages')) {
       // The hook's per-rep overhead (call + its tm_rd): an empty stage, emulator vs device.
-      final empty = assemble('    jplr\n', base).bytes;
+      final empty = pad4(assemble('    jplr\n', base).bytes);
       var hwEmpty = 0.0, emuEmpty = 0;
       if (dev != null) {
         await dev.upload(empty);

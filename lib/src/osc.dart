@@ -43,7 +43,11 @@ Uint8List oscMessage(String address, String types, List<Object> args) {
 }
 
 /// The upload of [blob] to [slot]: `iib` (offset, total length, part) per 1 KB.
-List<Uint8List> stageParts(List<int> blob, int slot) => [
+/// The device arms len/4 words, so a blob that is not a multiple of 4 bytes would lose
+/// its tail (a 138-byte blob lost its final `jplr` and hung the CPU, 2026-10-11).
+List<Uint8List> stageParts(List<int> blob, int slot) => blob.length % 4 != 0
+    ? throw ArgumentError('stage blob is ${blob.length} bytes; the device needs a multiple of 4')
+    : [
       for (var off = 0; off < blob.length; off += partBytes)
         oscMessage(slotPath[slot]!, 'iib', [off, blob.length, blob.sublist(off, (off + partBytes).clamp(0, blob.length))]),
     ];

@@ -34,6 +34,17 @@ Future<void> main(List<String> args) async {
 
   final file = args.first;
   final slot = args.contains('--vert') ? 2 : args.contains('--scan') ? 1 : int.parse(opt('--slot') ?? '0');
+  // A .bin is a ready blob (e.g. from tool/hw_bench.dart --emit): upload it as it is.
+  if (file.endsWith('.bin')) {
+    final st = CompiledStage(slot, File(file).readAsBytesSync(), '', const []);
+    stdout.writeln('blob: ${st.bytes.length} bytes, ${st.words.length} words, slot $slot');
+    if (args.contains('--osc')) {
+      final host = opt('--host') ?? Platform.environment['SCION_IP'] ?? '192.168.100.221';
+      await uploadStage(st, host, port: int.parse(opt('--port') ?? '9000'));
+      stdout.writeln('sent over OSC to $host');
+    }
+    return;
+  }
   final src = File(file).readAsStringSync();
   final CompiledStage st;
   try {
