@@ -104,34 +104,36 @@ __qsin:
 
   // isqrt32 (R8 unsigned) -> R8, the classic bit-pair method.
   '__isqrt': Routine('''
-__isqrt:
-    push %R0,%R1
-    ldi 0,%R0               // res
-    ldi 1073741824,%R1      // bit
+__isqrt:                    // floor(sqrt(R8)), the C's digit-by-digit loop; R10 res, R11 bit
+    ldi 0,%R10
+    ldi 1073741824,%R11
+    cmp %R8,%R11
+    jls __isqrt_go          // bit <= v
 __isqrt_top:
-    cmp %R8,%R1
-    jls __isqrt_loop        // bit <= v
-    lsr 2,%R1
-    jmp __isqrt_top
-__isqrt_loop:
-    cmpq 0,%R1
-    jz __isqrt_done
-    lea (%R0,0),%R9
-    add %R1,%R9             // res + bit
+    lsr 2,%R11
+    cmp %R8,%R11
+    jhi __isqrt_top         // bit > v
+    cmpq 0,%R11
+    jz __isqrt_done         // v == 0
+__isqrt_go:
+    lea (%R10,0),%R9
+    add %R11,%R9            // res + bit
     cmp %R9,%R8
     jc __isqrt_less         // v < res + bit
     sub %R9,%R8
-    lsr 1,%R0
-    add %R1,%R0
-    jmp __isqrt_next
+    lsr 1,%R10
+    add %R11,%R10
+    lsr 2,%R11
+    cmpq 0,%R11
+    jnz __isqrt_go
+    jmp __isqrt_done
 __isqrt_less:
-    lsr 1,%R0
-__isqrt_next:
-    lsr 2,%R1
-    jmp __isqrt_loop
+    lsr 1,%R10
+    lsr 2,%R11
+    cmpq 0,%R11
+    jnz __isqrt_go
 __isqrt_done:
-    lea (%R0,0),%R8
-    pop %R0,%R1
+    lea (%R10,0),%R8
     jplr
 '''),
   '__qsqrt': Routine('''

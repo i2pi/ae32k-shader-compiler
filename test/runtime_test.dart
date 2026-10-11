@@ -92,6 +92,16 @@ void main() {
   check('__qsin', 1, (a) => qSin(a[0]));
   check('__qcos', 1, (a) => qCos(a[0]));
   check('__qsqrt', 1, (a) => qSqrt(a[0]));
+  test('__isqrt on perfect squares +-1 and the full unsigned range', () {
+    final h = Harness('__isqrt');
+    final rng = Random(3);
+    final vs = <int>[0, 1, 2, 3, 0xffffffff, 0x80000000, 0x40000000, 0x3fffffff,
+      for (var r = 1; r < 65536; r += 1 + rng.nextInt(97)) ...[r * r - 1, r * r, r * r + 1],
+      for (var n = 0; n < 2000; n++) rng.nextInt(1 << 32)];
+    for (final v in vs) {
+      expect(h.call([v.toSigned(32)]) & 0xffffffff, isqrt32(v & 0xffffffff), reason: 'isqrt($v)');
+    }
+  });
   check('__udiv', 2, (a) => udiv32(a[0] & 0xffffffff, a[1] & 0xffffffff).toSigned(32));
   check('__qatan2', 2, (a) => qAtan2(a[0], a[1]));
   check('__qmod', 2, (a) => qMod(a[0], a[1]), random: 1000);
