@@ -63,13 +63,46 @@ stage is 1.6 KB, against the 4 KB upload limit.
 ## Use
 
 ```
-dart run bin/ae32k_shaderc.dart file.ss [--scan|--vert] [--fast] [--asm] [--out f.bin] [--check N] [--osc --host IP --knobs a,b]
-dart compile exe bin/ae32k_shaderc.dart -o ae32k_shaderc     # a standalone binary
+dart run bin/ae32k_shaderc.dart <file.ss | file.bin> [options]
+dart compile exe bin/ae32k_shaderc.dart -o ae32k_shaderc     # a standalone binary, same options
+```
+
+The first argument is the stage source. With a `.bin` instead, the blob is uploaded as-is: only
+the slot and upload flags apply.
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--scan` | | Compile for slot 1, the scan stage (0x1000E000). Its `@out` map is sent with the upload. |
+| `--vert` | | Compile for slot 2, the vertex stage (0x1000A000). |
+| `--slot N` | `0` | Compile for slot N: 0 warp (0x1000C000), 1 scan, 2 vertex. `--vert` wins over `--scan`, and either wins over `--slot`. The code is placed for its slot, so upload it to the slot it was built for. |
+| `--fast` | off | Drop the overflow handling for speed and size: `*` wraps instead of saturating, and `x / 0` gives +-32767.99 instead of 0 (`/` still saturates). Every other result is identical. See below. |
+| `--registers FILE` | compiled-in copy | The `registers.inc` that named `@out` lines resolve against. Use it to try register rows that are newer than the copy in the package. |
+| `--asm` | off | Print the generated assembly (stage, then runtime routines) to stdout. |
+| `--out FILE` | none | Write the blob to FILE: little-endian, padded to 4 bytes, exactly what is uploaded. |
+| `--check N` | off | Run N evaluations in the emulator on random inputs and compare all 16 outputs with the reference interpreter. `--fast` builds are compared with the `--fast` reference. Prints the worst-case cycle estimate. Exits with status 2 on the first mismatch. |
+| `--osc` | off | Upload over OSC/UDP the way `shader.py --osc` does: 1 KB parts to `/send/1/shader/{part,scanpart,vertpart}`, then the knobs, then (scan stage) the `@out` map. The device arms the blob only when its checksum matches; confirm with `imcu tiles stat` / `imcu scan stat`. |
+| `--host IP` | `$SCION_IP`, else 192.168.100.221 | Where `--osc` sends. |
+| `--port P` | `9000` | The device's OSC port. |
+| `--knobs a,b,...` | none | After the upload, set knobs `k0`, `k1`, ... to these values (`/send/1/shader/k/<n>`, float, 1.0 = 1.0). |
+| `-h`, `--help` | | Print the flag summary. |
+
+Every run prints the blob size, plus the number of map entries for a scan stage. A syntax or
+compile error (unknown register name, a stage over the 4 KB limit, ...) exits with status 1.
+Run with no arguments, it prints the summary and exits with status 64.
+
+Examples:
+
+```
+ae32k_shaderc ripple.ss --check 200                      # compile the warp stage and verify it
+ae32k_shaderc frag3.ss --scan --fast --osc               # build and upload a scan stage with its @out map
+ae32k_shaderc verts_test.ss --vert --fast --osc --host 10.0.0.7 --knobs 1.5,0.25
+ae32k_shaderc scan1.ss --scan --asm --out scan1.bin      # inspect the code, keep the blob
 ```
 
 Same slots, upload paths and packets as `tools/imcu/shader.py` (pinned by `test/osc_test.dart`).
-From Dart/Flutter, use `compileStage(source, slot: n)` (pure Dart, any platform) and
-`uploadStage(stage, host)` from `package:ae32k_shader_compiler/upload.dart` (dart:io).
+From Dart/Flutter, use `compileStage(source, slot: n, fast: bool, registers: map)` (pure Dart,
+any platform) and `uploadStage(stage, host, port: p, knobs: [...])` from
+`package:ae32k_shader_compiler/upload.dart` (dart:io).
 
 `--fast` (`compileStage(..., fast: true)`) drops the overflow handling:
 - `*` wraps instead of saturating at +-32767.99;

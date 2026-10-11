@@ -1,8 +1,9 @@
 // ae32k_shaderc: compile a Scion shader stage to native AE32000 code (no gcc, no Wine),
 // optionally check it in the emulator and upload it over OSC.
 //
-//   dart run bin/ae32k_shaderc.dart file.ss [--scan | --vert | --slot N] [--fast] [--asm] [--out f.bin]
-//                                   [--check N] [--osc] [--host IP] [--port P] [--knobs a,b,..]
+//   dart run bin/ae32k_shaderc.dart <file.ss | file.bin> [--scan | --vert | --slot N] [--fast]
+//       [--registers FILE] [--asm] [--out f.bin] [--check N] [--osc] [--host IP] [--port P] [--knobs a,b,..]
+// Every flag is described in README.md (Use).
 // Same slots and upload as tools/imcu/shader.py: warp = slot 0 (default), --scan = 1, --vert = 2.
 import 'dart:io';
 import 'dart:math';
@@ -37,7 +38,7 @@ Future<void> main(List<String> args) async {
 
   final file = args.first;
   final slot = args.contains('--vert') ? 2 : args.contains('--scan') ? 1 : int.parse(opt('--slot') ?? '0');
-  // A .bin is a ready blob (e.g. from tool/hw_bench.dart --emit): upload it as it is.
+  // A .bin is a ready blob (e.g. from --out): upload it as it is.
   if (file.endsWith('.bin')) {
     final st = CompiledStage(slot, File(file).readAsBytesSync(), '', const []);
     stdout.writeln('blob: ${st.bytes.length} bytes, ${st.words.length} words, slot $slot');
