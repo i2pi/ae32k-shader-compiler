@@ -39,7 +39,6 @@ class CodeGen {
   final _homes = <String, int>{}; // local -> register
   final _slots = <String, int>{}; // local -> stack offset
   final _calls = <String>{};
-  var _scratch = false; // an inline sequence used R10-R13
   var _label = 0;
 
   /// Fast mode: no saturation on q_mul / q_div and no zero-divisor test; results match
@@ -65,34 +64,51 @@ class CodeGen {
     for (final s in p.body) {
       _stmt(s);
     }
-    final lows = [for (final r in _used.where((r) => r < 8).toList()..sort()) '%R$r'];
-    final highs = [for (final r in [if (_calls.isNotEmpty || _scratch) ...[10, 11, 12, 13], 14]) '%R$r'];
-    final frame = 4 * _slots.length;
-    final head = StringBuffer()
-      ..writeln('stage:')
-      ..writeln('    push %lr');
-    if (lows.isNotEmpty) head.writeln('    push ${lows.join(',')}');
-    head
-      ..writeln('    push ${highs.join(',')}')
-      ..writeln('    lea (%R8,0),%R14');
-    if (frame > 0) head.writeln('    lea (%SP,${-frame}),%SP');
+    // The body (locals start at 0, as in C), with copies removed; then the prologue and
+    // epilogue save exactly what the final body touches: R10-R13 whenever it calls the runtime
+    // (which clobbers them), %lr only when it calls, and R14 only when it needs the ctx
+    // pointer to outlive R8 (a call, or R8 used for anything else).
+    final body = StringBuffer();
     for (final l in _homes.values) {
-      head.writeln('    ldi 0,%R$l'); // C locals start at 0
+      body.writeln('    ldi 0,%R$l');
     }
     for (final o in _slots.values) {
-      head
-        ..writeln('    ldi 0,%R8')
-        ..writeln('    st %R8,(%SP,$o)');
+      body
+        ..writeln('    ldi 0,%R9')
+        ..writeln('    st %R9,(%SP,$o)');
     }
+    body.write(_out);
+    // the body runs from `R14 = ctx` to an exit that reads only R8 (the epilogue restores the rest)
+    var code = '    lea (%R8,0),%R14\n$body    ldi 0,%R8\n    jplr\n';
+    if (!copies) code = removeCopies(code, exitLive: {8});
+    code = code.substring(0, code.lastIndexOf('    jplr'));
+    code = code.replaceFirst('    lea (%R8,0),%R14\n', '');
+    final calls = RegExp(r'^\s+jal ', multiLine: true).hasMatch(code);
+    // without calls, and with R8 written only by the final ldi 0, R8 still holds ctx at every
+    // read: use it and leave R14 alone
+    final r8Free = !calls && !regsWritten(code.substring(0, code.lastIndexOf('    ldi 0,%R8'))).contains(8);
+    final ctx = r8Free && !copies ? 8 : 14;
+    if (ctx == 8) code = code.replaceAll('%R14', '%R8');
+    // runtime routines read ctx through R14 (the sine table), so a call keeps it
+    final refs = {for (final m in RegExp(r'%R(\d+)\b').allMatches(code)) int.parse(m[1]!), if (calls) 14};
+    final saved = [
+      for (final r in [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14])
+        if ((refs.contains(r) && (r != 14 || ctx == 14)) || (calls && r >= 10 && r <= 13)) r,
+    ];
+    final frame = 4 * _slots.length;
+    final head = StringBuffer('stage:\n');
+    if (calls) head.writeln('    push %lr');
+    final lows = [for (final r in saved) if (r < 8) '%R$r'], highs = [for (final r in saved) if (r >= 8) '%R$r'];
+    if (lows.isNotEmpty) head.writeln('    push ${lows.join(',')}');
+    if (highs.isNotEmpty) head.writeln('    push ${highs.join(',')}');
+    if (refs.contains(14)) head.writeln('    lea (%R8,0),%R14');
+    if (frame > 0) head.writeln('    lea (%SP,${-frame}),%SP');
     final tail = StringBuffer();
     if (frame > 0) tail.writeln('    lea (%SP,$frame),%SP');
-    tail
-      ..writeln('    ldi 0,%R8')
-      ..writeln('    pop ${highs.join(',')}');
+    if (highs.isNotEmpty) tail.writeln('    pop ${highs.join(',')}');
     if (lows.isNotEmpty) tail.writeln('    pop ${lows.join(',')}');
-    tail.writeln('    pop %pc');
-    final stage = '$head$_out$tail';
-    return '${copies ? stage : removeCopies(stage)}${runtimeFor(_calls, fast: fast)}';
+    tail.writeln(calls ? '    pop %pc' : '    jplr');
+    return '$head$code$tail${runtimeFor(_calls, fast: fast)}';
   }
 
   void _e(String s) => _out.writeln('    $s');
@@ -429,7 +445,6 @@ class CodeGen {
       _e('ldi 0,%R$r');
       return;
     }
-    _scratch = true;
     if (fast && cl == 0) {
       // without saturation, q_mul by a whole number is the wrapping product
       final d = r.isEven ? r : 10;
@@ -501,7 +516,6 @@ class CodeGen {
   void _divPow2Reg(int r, int c) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;
     final m = mag.bitLength - 1;
-    _scratch = true;
     final lAbs = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
     _e('lea (%R$r,0),%R9'); // x, for the sign
     _e('cmpq 0,%R$r');

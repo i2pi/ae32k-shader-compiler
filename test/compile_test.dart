@@ -82,6 +82,24 @@ void main() {
     });
   }
 
+  test('minimal stages around each runtime call (prologue / ctx register choices)', () {
+    // a body whose only ctx reads come before a call that reads ctx itself (sin's table)
+    const bodies = [
+      'out.dx = sin(in.x);', 'out.dx = cos(in.x);', 'let a = in.x; out.dx = abs(sin(a));', 'out.dx = sqrt(in.x);',
+      'out.dx = atan2(in.x, in.y);', 'out.dx = noise(in.x, in.y);', 'out.dx = in.x / in.y;', 'out.dx = in.x * in.y;',
+      'out.dx = mod(in.x, in.y);', 'out.dx = smoothstep(in.x, in.y, in.u);', 'out.dx = 1;', 'let a = 2;',
+      'if (in.x > 0) { out.dx = sin(in.y); }', 'out.dx = in.x * 1.5; out.dy = in.y / 4;',
+      // no ctx access after the call: only the routine itself reads R14
+      'let a = sin(in.x);', 'let a = min(in.x, 1); a = abs(sin(a));', 'let a = cos(in.y) + noise(in.x, 1);',
+    ];
+    final rng = Random(5);
+    for (final fast in [false, true]) {
+      for (final b in bodies) {
+        checkProgram(b, b, 0, rng, runs: 30, fast: fast);
+      }
+    }
+  });
+
   test('400 random programs, fast', () {
     final rng = Random(20261012);
     final gen = RandomProgram(rng);

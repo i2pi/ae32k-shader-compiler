@@ -25,6 +25,9 @@ const _callUse = {8, 9, 10, 14}, _callDef = {8, 9, 10, 11, 12, 13};
 
 final _reg = RegExp(r'%R(\d+)\b');
 
+// registers read by an exit (jplr / pop %pc); everything unless removeCopies says otherwise
+Set<int> _exitUses = _all;
+
 class _Ins {
   String? label; // a label line
   String m = '';
@@ -46,7 +49,8 @@ class _Ins {
   Set<int> get uses {
     if (isLabel || isBranch || m == 'nop' || m == 'pop' && !isExit) return {};
     if (isCall) return _callUse;
-    if (isExit || !known) return _all;
+    if (isExit) return _exitUses;
+    if (!known) return _all;
     if (m == 'push') return {for (final o in ops) ..._regs(o)};
     if (_defOnly.contains(m)) return {for (final o in ops.take(ops.length - 1)) ..._regs(o)};
     return {for (final o in ops) ..._regs(o)}; // useDef and useAll read every operand
@@ -209,9 +213,18 @@ bool _step(List<_Ins> code) {
   return false;
 }
 
-/// Removes register copies from [asm] (one stage's code, no runtime routines).
-String removeCopies(String asm) {
+/// Removes register copies from [asm] (one stage's code, no runtime routines). [exitLive]:
+/// the registers an exit reads (default all; a stage body ending in its epilogue: R8 only).
+String removeCopies(String asm, {Set<int>? exitLive}) {
   final code = _parse(asm);
-  for (var n = 0; n < 2000 && _step(code); n++) {}
+  _exitUses = exitLive ?? _all;
+  try {
+    for (var n = 0; n < 2000 && _step(code); n++) {}
+  } finally {
+    _exitUses = _all;
+  }
   return '${code.join('\n')}\n';
 }
+
+/// The registers some instruction in [asm] writes (calls count as writing R8-R13).
+Set<int> regsWritten(String asm) => {for (final i in _parse(asm)) ...i.defs};
