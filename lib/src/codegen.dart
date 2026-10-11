@@ -309,6 +309,12 @@ class CodeGen {
           _divPow2Reg(v.r, d.q, _range(l));
           return v;
         }
+        final k = d is Num ? _intDivisor(d.q) : null;
+        if (k != null) {
+          final v = _own(_expr(l));
+          _divIntReg(v.r, (d as Num).q, k, _range(l));
+          return v;
+        }
         return _runtime('__qdiv', [l, r]);
       case '%':
         final d = _fold(r);
@@ -318,6 +324,18 @@ class CodeGen {
           final t = _alloc();
           _e('lea (%R${v.r},0),%R$t');
           _divPow2Reg(t, d.q);
+          _e('and -65536,%R$t');
+          _mulConstReg(t, d.q);
+          _e('sub %R$t,%R${v.r}');
+          _free.insert(0, t);
+          return v;
+        }
+        final k = d is Num ? _intDivisor(d.q) : null;
+        if (k != null) {
+          final v = _own(_expr(l));
+          final t = _alloc();
+          _e('lea (%R${v.r},0),%R$t');
+          _divIntReg(t, (d as Num).q, k, _range(l));
           _e('and -65536,%R$t');
           _mulConstReg(t, d.q);
           _e('sub %R$t,%R${v.r}');
@@ -626,6 +644,81 @@ class CodeGen {
     _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
     _e('neg %R$r');
     _out.writeln('$lDone:');
+  }
+
+  /// (M, S) with floor(x * M / 2^S) == floor(x / k) for every x in [0, 2^31], M < 2^32,
+  /// S >= 32. With M*k = 2^S + e (0 <= e < k), x*M/2^S = x/k + x*e/(k*2^S); the floor stays
+  /// floor(x/k) when that excess is below 1/k, i.e. when x*e < 2^S, so 2^31*e < 2^S suffices.
+  static (int, int)? magic(int k) {
+    for (var sh = 32; sh < 63; sh++) {
+      final p = BigInt.one << sh, kb = BigInt.from(k);
+      final m = (p + kb - BigInt.one) ~/ kb; // ceil(2^S / k)
+      if (m >= BigInt.one << 32) return null;
+      final e = m * kb - p;
+      if ((BigInt.one << 31) * e < p) return (m.toInt(), sh);
+    }
+    return null;
+  }
+
+  /// A whole-number divisor 3 <= k < 2^15 that is not a power of two: q_div(x, c) is
+  /// sign * floor(|x| / k) (no saturation for k >= 2), computed by multiplying with a
+  /// reciprocal. Returns k, or null when [c] is not such a constant.
+  static int? _intDivisor(int c) {
+    final mag = c < 0 ? (-c) & 0xffffffff : c;
+    if (mag & 0xffff != 0) return null;
+    final k = mag >> 16;
+    if (k < 3 || k >= 1 << 15 || k & (k - 1) == 0 || magic(k) == null) return null;
+    return k;
+  }
+
+  /// R[r] = q_div(R[r], c) for c = +-k (whole, see [_intDivisor]): the high word of |x| * M
+  /// from four 16x16 products, shifted. Uses R8-R13.
+  void _divIntReg(int r, int c, int k, [Range? xr]) {
+    final (m, sh) = magic(k)!;
+    final mh = m >> 16, ml = m & 0xffff;
+    final nonNeg = xr != null && xr.nonNeg;
+    final lAbs = _newLabel(), lDone = _newLabel();
+    if (!nonNeg) {
+      _e('lea (%R$r,0),%R9'); // x, for the sign
+      _e('cmpq 0,%R$r');
+      _e('jge $lAbs');
+      _e('neg %R$r');
+      _out.writeln('$lAbs:');
+    }
+    _e('lea (%R$r,0),%R10');
+    _e('lsr 16,%R10'); // xh
+    _e('lea (%R$r,0),%R12');
+    _e('and 65535,%R12'); // xl
+    _e('lea (%R12,0),%R8');
+    _e('mul $mh,%R8'); // xl*Mh
+    _e('mul $ml,%R12');
+    _e('lsr 16,%R12'); // mid = xl*Ml >> 16
+    _e('lea (%R8,0),%R11');
+    _e('and 65535,%R11');
+    _e('add %R11,%R12'); // mid += lo(xl*Mh)
+    _e('lsr 16,%R8');
+    _e('lea (%R8,0),%R13'); // hi(xl*Mh)
+    _e('lea (%R10,0),%R8');
+    _e('mul $ml,%R8'); // xh*Ml
+    _e('lea (%R8,0),%R11');
+    _e('and 65535,%R11');
+    _e('add %R11,%R12'); // mid += lo(xh*Ml)
+    _e('lsr 16,%R8');
+    _e('add %R8,%R13');
+    _e('mul $mh,%R10'); // xh*Mh
+    _e('add %R13,%R10');
+    _e('lsr 16,%R12');
+    _e('add %R12,%R10'); // the high word of |x|*M
+    if (sh > 32) _e('lsr ${sh - 32},%R10');
+    if (!nonNeg) {
+      _e('cmpq 0,%R9');
+      _e('${c < 0 ? 'jlt' : 'jge'} $lDone');
+      _e('neg %R10');
+    } else if (c < 0) {
+      _e('neg %R10');
+    }
+    _out.writeln('$lDone:');
+    _e('lea (%R10,0),%R$r');
   }
 
   static bool _pow2(int c) {

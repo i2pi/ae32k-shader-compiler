@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
+import 'package:ae32k_shader_compiler/src/codegen.dart';
 import 'package:ae32k_shader_compiler/src/emu.dart';
 import 'package:ae32k_shader_compiler/src/lang/eval.dart';
 import 'package:ae32k_shader_compiler/src/lang/parser.dart';
@@ -99,6 +100,39 @@ void main() {
       }
     }
   });
+
+  test('the reciprocal for every whole divisor 3..32767: floor(x*M >> S) == x ~/ k', () {
+    final rng = Random(9);
+    for (var k = 3; k < 1 << 15; k++) {
+      if (k & (k - 1) == 0) continue;
+      final (m, sh) = CodeGen.magic(k)!;
+      final xs = [0, 1, k - 1, k, k + 1, 0x7fffffff, 0x80000000, 0x80000000 - (0x80000000 % k), 0x80000000 - (0x80000000 % k) - 1,
+        for (var n = 0; n < 40; n++) rng.nextInt(1 << 31)];
+      for (final x in xs) {
+        expect((BigInt.from(x) * BigInt.from(m)) >> sh, BigInt.from(x ~/ k), reason: 'k=$k x=$x');
+      }
+    }
+  });
+
+  for (final fast in [false, true]) {
+    test('q_div / q_mod by whole constants (inline reciprocal)${fast ? ', fast' : ''}', () {
+      const consts = ['3', '-3', '12', '1080', '1920', '7', '-1000', '32767', '10', '100', '255'];
+      final rng = Random(11);
+      final xs = [0, 1, -1, 11, 12, 13, -12, -13, 0x7fffffff, -0x7fffffff, -0x80000000, 0x10000, -0x10000,
+        for (var n = 0; n < 60; n++) rng.nextInt(1 << 32) - (1 << 31)];
+      for (final c in consts) {
+        final src = 'out.dx = in.x / $c;\nout.dy = mod(in.x, $c);\nout.o2 = (in.y + 0.5) / $c;';
+        final st = compileStage(src, fast: fast);
+        expect(st.asm, isNot(contains('jal __qdiv')), reason: c);
+        final runner = StageRunner(st.bytes);
+        final prog = parse(src);
+        for (final x in xs) {
+          final inputs = {'x': x, 'y': x ^ 0x1234567};
+          expect(runner.run(inputs).sublist(0, 3), evaluate(prog, inputs, null, fast).sublist(0, 3), reason: 'x=$x c=$c');
+        }
+      }
+    });
+  }
 
   test('400 random programs, fast', () {
     final rng = Random(20261012);

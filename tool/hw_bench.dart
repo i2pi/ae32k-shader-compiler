@@ -1,7 +1,7 @@
 // Times code on the device with the resident's run-once hook (`imcu hybrun a <slot> <reps>`,
 // timer 0 = cpu/4 ticks) and compares it with the emulator.
 //
-//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages [--stage name,...]] [--round2]
+//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages [--stage name,...] [--corpus]] [--round2]
 //
 // Microbenchmarks: each body is assembled at two repeat counts. The cost of one body is
 // d(ticks)*4 / (reps * dN), so the hook's call overhead and the blob's setup cancel. Every
@@ -234,8 +234,9 @@ Future<void> main(List<String> args) async {
         ...Directory('test/golden/gcc').listSync().whereType<File>().where((f) => f.path.endsWith('.ss')),
       ];
       final have = {for (final f in ex) f.uri.pathSegments.last};
-      final more = Directory('../../tools/imcu/examples');
-      if (more.existsSync()) {
+      for (final dir in ['../../tools/imcu/examples', if (args.contains('--corpus')) '../../tools/imcu/examples/corpus']) {
+        final more = Directory(dir);
+        if (!more.existsSync()) continue;
         ex.addAll(more.listSync().whereType<File>().where((f) => f.path.endsWith('.ss') && !have.contains(f.uri.pathSegments.last)));
       }
       ex.sort((a, b) => a.uri.pathSegments.last.compareTo(b.uri.pathSegments.last));
