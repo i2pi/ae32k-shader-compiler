@@ -157,131 +157,11 @@ __qsqrt_big:
 ''', ['__isqrt']),
 
   // udiv32 (R8 / R9, unsigned) -> R8, shift-subtract.
-  '__udiv': Routine('''
-__udiv:
-    push %R0,%R1
-    ldi 0,%R0               // q
-    ldi 0,%R1               // s
-    cmpq 0,%R9
-    jz __udiv_zero
-    cmp %R9,%R8
-    jc __udiv_zero          // n < d
-__udiv_align:
-    lea (%R8,0),%R10
-    lsr 1,%R10
-    cmp %R10,%R9
-    jhi __udiv_loop         // d > n >> 1
-    cmp 31,%R1
-    jge __udiv_loop
-    add %R9,%R9
-    addq 1,%R1
-    jmp __udiv_align
-__udiv_loop:
-    add %R0,%R0
-    cmp %R9,%R8
-    jc __udiv_skip
-    sub %R9,%R8
-    or 1,%R0
-__udiv_skip:
-    lsr 1,%R9
-    addq -1,%R1
-    jge __udiv_loop
-    lea (%R0,0),%R8
-    pop %R0,%R1
-    jplr
-__udiv_zero:
-    ldi 0,%R8
-    pop %R0,%R1
-    jplr
-'''),
 
   // q_atan2 (R8 = y, R9 = x) -> turns, octant reduction + 65-entry table.
-  '__qatan2': Routine('''
-__qatan2:
-    push %lr
-    push %R0,%R1,%R2,%R3,%R4,%R6
-    lea (%R8,0),%R2         // y
-    lea (%R9,0),%R3         // x
-    lea (%R8,0),%R0
-    cmpq 0,%R0
-    jge __qatan2_ay
-    neg %R0
-__qatan2_ay:                // R0 = |y|
-    lea (%R9,0),%R1
-    cmpq 0,%R1
-    jge __qatan2_ax
-    neg %R1
-__qatan2_ax:                // R1 = |x|
-    lea (%R1,0),%R4         // big
-    lea (%R0,0),%R6         // small
-    cmp %R0,%R1
-    jhi __qatan2_ord        // |x| > |y|
-    lea (%R0,0),%R4
-    lea (%R1,0),%R6
-__qatan2_ord:
-    cmpq 0,%R4
-    jnz __qatan2_nz
-    ldi 0,%R8
-    jmp __qatan2_ret
-__qatan2_nz:
-    cmp 131072,%R4
-    jnc __qatan2_wide       // big >= 1 << 17
-    lea (%R6,0),%R8
-    asl 14,%R8
-    lea (%R4,0),%R9
-    jmp __qatan2_div
-__qatan2_wide:
-    lea (%R6,0),%R8
-    lea (%R4,0),%R9
-    lsr 14,%R9
-__qatan2_div:
-    jal __udiv              // r
-    lea (%R8,0),%R4
-    lsr 8,%R4               // i
-    and 255,%R8             // f
-    cmp 63,%R4
-    jls __qatan2_lut
-    ldi 63,%R4
-    ldi 255,%R8
-__qatan2_lut:
-    add %R4,%R4
-    ldi __qatan2_tab,%R6
-    add %R4,%R6
-    ldsu (%R6,0),%R4        // AT[i]
-    ldsu (%R6,2),%R6        // AT[i + 1]
-    ldi 256,%R9
-    sub %R8,%R9
-    mul %R9,%R4
-    mul %R8,%R6
-    add %R6,%R4
-    asr 8,%R4               // a
-    cmp %R0,%R1
-    jnc __qatan2_x          // |x| >= |y|
-    ldi 16384,%R8
-    sub %R4,%R8
-    lea (%R8,0),%R4
-__qatan2_x:
-    cmpq 0,%R3
-    jge __qatan2_y
-    ldi 32768,%R8
-    sub %R4,%R8
-    lea (%R8,0),%R4
-__qatan2_y:
-    lea (%R4,0),%R8
-    cmpq 0,%R2
-    jge __qatan2_ret
-    neg %R8
-__qatan2_ret:
-    pop %R0,%R1,%R2,%R3,%R4,%R6
-    pop %pc
-    .align 2
-__qatan2_tab:
-    .short 0, 163, 326, 489, 651, 813, 975, 1136, 1297, 1457, 1617, 1775, 1933, 2090, 2246, 2401
-    .short 2555, 2708, 2860, 3010, 3159, 3307, 3453, 3599, 3742, 3884, 4025, 4164, 4302, 4438, 4572, 4705
-    .short 4836, 4966, 5094, 5220, 5344, 5467, 5589, 5708, 5826, 5943, 6058, 6171, 6282, 6392, 6500, 6607
-    .short 6712, 6815, 6917, 7018, 7117, 7214, 7310, 7405, 7498, 7589, 7679, 7768, 7856, 7942, 8026, 8110
-    .short 8192
-''', ['__udiv']),
+  // atan2 of the C: the ratio small/big in Q14 (below 2^15, so a fixed 15-step division),
+  // then the 65-entry table.
+  '__qatan2': Routine(_qatan2),
 
   // q_mod (R8 = a, R9 = b): b ? a - q_mul(q_floor(q_div(a, b)), b) : 0
   '__qmod': Routine('''
@@ -438,24 +318,25 @@ __qdiv_zero:
     jplr
 ''';
 
-// The __vh hash inline: R8 = ix, R9 = iy -> R8, clobbers R9, R10.
-const _vhInline = '''
-    mul 73856093,%R8
-    lea (%R9,0),%R10
-    mul 19349663,%R10
-    xor %R10,%R8
-    xor -1640531527,%R8
-    mul -1640531535,%R8
+// The __vh hash of (ix, iy) from its two products: R8 = (A ^ B ^ C) mixed, where A = ix*K1
+// is in R[a] and B = iy*K2 in R[b]. (ix + 1)*K1 = ix*K1 + K1 mod 2^32, so the four corner
+// hashes share two multiplies each way. Clobbers R8, R9.
+String _vh2(int a, int b) => '''
+    lea (%R$a,0),%R8
+    xor %R$b,%R8
+    xor -1640531527,%R8     // 0x9E3779B9
+    mul -1640531535,%R8     // 2654435761
     lea (%R8,0),%R9
     lsr 15,%R9
     xor %R9,%R8
-    mul -2048144777,%R8
+    mul -2048144777,%R8     // 2246822519
     lea (%R8,0),%R9
     lsr 13,%R9
     xor %R9,%R8
     and 65535,%R8''';
 
 // q_mul(f, f) then q_mul(m, 3 - 2f) for a fraction f in R[f] (even): the weight into R[f].
+// Clobbers R8, R10.
 String _weight(int f) => '''
     lea (%R$f,0),%R8
     mul %R$f,%R$f
@@ -487,49 +368,156 @@ ${l}e:''';
 
 final _qnoise = '''
 __qnoise:
-    push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
-    lea (%R8,0),%R0
-    asr 16,%R0              // ix
-    lea (%R9,0),%R1
-    asr 16,%R1              // iy
+    push %R2,%R3,%R4,%R6
     lea (%R8,0),%R2
     and 65535,%R2           // fx
     lea (%R9,0),%R4
     and 65535,%R4           // fy
+    lea (%R8,0),%R11
+    asr 16,%R11             // ix
+    lea (%R9,0),%R13
+    asr 16,%R13             // iy
 ${_weight(2)}
 ${_weight(4)}
     lea (%R4,0),%R3         // sy
-    lea (%R0,0),%R8
-    lea (%R1,0),%R9
-$_vhInline
+    lea (%R11,0),%R10
+    mul 73856093,%R10       // A0 = ix*K1
+    lea (%R10,0),%R11
+    add 73856093,%R11       // A1 = (ix + 1)*K1
+    lea (%R13,0),%R12
+    mul 19349663,%R12       // B0 = iy*K2
+    lea (%R12,0),%R13
+    add 19349663,%R13       // B1 = (iy + 1)*K2
+${_vh2(10, 12)}
     lea (%R8,0),%R4         // a
-    lea (%R0,0),%R8
-    addq 1,%R8
-    lea (%R1,0),%R9
-$_vhInline
-    lea (%R8,0),%R5         // b
-    lea (%R0,0),%R8
-    lea (%R1,0),%R9
-    addq 1,%R9
-$_vhInline
-    lea (%R8,0),%R6         // c
-    lea (%R0,0),%R8
-    addq 1,%R8
-    lea (%R1,0),%R9
-    addq 1,%R9
-$_vhInline
-    lea (%R8,0),%R7         // d
-    lea (%R5,0),%R8
-    sub %R4,%R8
+${_vh2(11, 12)}
+    sub %R4,%R8             // b - a
 ${_scale(2, '__qnoise_t')}
     add %R8,%R4             // top = a + q_mul(b - a, sx)
-    lea (%R7,0),%R8
-    sub %R6,%R8
+${_vh2(10, 13)}
+    lea (%R8,0),%R6         // c
+${_vh2(11, 13)}
+    sub %R6,%R8             // d - c
 ${_scale(2, '__qnoise_b')}
     add %R6,%R8             // bot = c + q_mul(d - c, sx)
     sub %R4,%R8
 ${_scale(3, '__qnoise_f')}
     add %R4,%R8             // top + q_mul(bot - top, sy)
-    pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7
+    pop %R2,%R3,%R4,%R6
     jplr
 ''';
+
+final _qatan2 = '''
+__qatan2:
+    push %R0,%R1,%R2,%R3,%R4,%R6
+    lea (%R8,0),%R2         // y
+    lea (%R9,0),%R3         // x
+    lea (%R8,0),%R0
+    cmpq 0,%R0
+    jge __qatan2_ay
+    neg %R0
+__qatan2_ay:                // R0 = |y|
+    lea (%R9,0),%R1
+    cmpq 0,%R1
+    jge __qatan2_ax
+    neg %R1
+__qatan2_ax:                // R1 = |x|
+    lea (%R1,0),%R4         // big
+    lea (%R0,0),%R6         // small
+    cmp %R0,%R1
+    jhi __qatan2_ord        // |x| > |y|
+    lea (%R0,0),%R4
+    lea (%R1,0),%R6
+__qatan2_ord:
+    cmpq 0,%R4
+    jnz __qatan2_nz
+    ldi 0,%R8
+    jmp __qatan2_ret
+$_atanDiv
+    lea (%R8,0),%R4
+    lsr 8,%R4               // i
+    and 255,%R8             // f
+    cmp 63,%R4
+    jls __qatan2_lut
+    ldi 63,%R4
+    ldi 255,%R8
+__qatan2_lut:
+    add %R4,%R4
+    ldi __qatan2_tab,%R6
+    add %R4,%R6
+    ldsu (%R6,0),%R4        // AT[i]
+    ldsu (%R6,2),%R6        // AT[i + 1]
+    ldi 256,%R9
+    sub %R8,%R9
+    mul %R9,%R4
+    mul %R8,%R6
+    add %R6,%R4
+    asr 8,%R4               // a
+    cmp %R0,%R1
+    jnc __qatan2_x          // |x| >= |y|
+    ldi 16384,%R8
+    sub %R4,%R8
+    lea (%R8,0),%R4
+__qatan2_x:
+    cmpq 0,%R3
+    jge __qatan2_y
+    ldi 32768,%R8
+    sub %R4,%R8
+    lea (%R8,0),%R4
+__qatan2_y:
+    lea (%R4,0),%R8
+    cmpq 0,%R2
+    jge __qatan2_ret
+    neg %R8
+__qatan2_ret:
+    pop %R0,%R1,%R2,%R3,%R4,%R6
+    jplr
+    .align 2
+__qatan2_tab:
+    .short 0, 163, 326, 489, 651, 813, 975, 1136, 1297, 1457, 1617, 1775, 1933, 2090, 2246, 2401
+    .short 2555, 2708, 2860, 3010, 3159, 3307, 3453, 3599, 3742, 3884, 4025, 4164, 4302, 4438, 4572, 4705
+    .short 4836, 4966, 5094, 5220, 5344, 5467, 5589, 5708, 5826, 5943, 6058, 6171, 6282, 6392, 6500, 6607
+    .short 6712, 6815, 6917, 7018, 7117, 7214, 7310, 7405, 7498, 7589, 7679, 7768, 7856, 7942, 8026, 8110
+    .short 8192
+''';
+
+// r = udiv32(small << 14, big) for big < 2^17, else udiv32(small, big >> 14): small <= big
+// keeps r below 2^15 (big >= 2^17: big >> 14 >= 8, so small / (big >> 14) < 2^14 * 8/7), so
+// both are a fixed number of unrolled restoring steps. R4 = big (non-zero), R6 = small -> R8.
+final _atanDiv = [
+  '__qatan2_nz:',
+  '    ldi 0,%R9               // r',
+  '    lea (%R6,0),%R8         // remainder',
+  '    cmp 131072,%R4',
+  '    jnc __qatan2_wide       // big >= 1 << 17',
+  '    cmp %R4,%R8',
+  '    jc __qatan2_n0          // small < big: no integer bit',
+  '    sub %R4,%R8',
+  '    addq 1,%R9',
+  '__qatan2_n0:',
+  for (var k = 1; k <= 14; k++) ...[
+    '    add %R8,%R8',
+    '    add %R9,%R9',
+    '    cmp %R4,%R8',
+    '    jc __qatan2_n$k',
+    '    sub %R4,%R8',
+    '    addq 1,%R9',
+    '__qatan2_n$k:',
+  ],
+  '    jmp __qatan2_q',
+  '__qatan2_wide:',
+  '    lea (%R4,0),%R10',
+  '    lsr 14,%R10',
+  '    asl 14,%R10             // (big >> 14) << 14, below 2^32',
+  for (var k = 14; k >= 0; k--) ...[
+    '    add %R9,%R9',
+    '    cmp %R10,%R8',
+    '    jc __qatan2_w$k',
+    '    sub %R10,%R8',
+    '    addq 1,%R9',
+    '__qatan2_w$k:',
+    if (k > 0) '    lsr 1,%R10',
+  ],
+  '__qatan2_q:',
+  '    lea (%R9,0),%R8',
+].join('\n');

@@ -102,7 +102,22 @@ void main() {
       expect(h.call([v.toSigned(32)]) & 0xffffffff, isqrt32(v & 0xffffffff), reason: 'isqrt($v)');
     }
   });
-  check('__udiv', 2, (a) => udiv32(a[0] & 0xffffffff, a[1] & 0xffffffff).toSigned(32));
+  test('__qatan2 around its division: big near 2^17, small == big, extremes', () {
+    final h = Harness('__qatan2');
+    final rng = Random(13);
+    final bigs = [1, 2, 3, 0xffff, 0x10000, 0x1ffff, 0x20000, 0x20001, 0x3ffff, 0x7fffffff, 0x80000000,
+      for (var n = 0; n < 200; n++) 1 + rng.nextInt(1 << (1 + rng.nextInt(31)))];
+    for (final big in bigs) {
+      for (final small in {0, 1, big, big - 1, big ~/ 2, big ~/ 3 + 1, rng.nextInt(big) + 0}) {
+        for (final (sy, sx) in [(1, 1), (-1, 1), (1, -1), (-1, -1)]) {
+          for (final swap in [false, true]) {
+            final a = ((swap ? small : big) * sy).toSigned(32), b = ((swap ? big : small) * sx).toSigned(32);
+            expect(h.call([a, b]), qAtan2(a, b), reason: 'atan2($a, $b)');
+          }
+        }
+      }
+    }
+  });
   check('__qatan2', 2, (a) => qAtan2(a[0], a[1]));
   check('__qmod', 2, (a) => qMod(a[0], a[1]), random: 1000);
   check('__qsmooth', 3, (a) => qSmoothstep(a[0], a[1], a[2]), random: 1000);
