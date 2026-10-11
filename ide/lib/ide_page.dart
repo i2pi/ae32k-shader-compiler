@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'asm_pane.dart';
 import 'code_editor.dart';
 import 'device.dart';
+import 'io_pane.dart';
 import 'templates.dart';
 import 'theme.dart';
 
@@ -40,8 +41,13 @@ class _IdePageState extends State<IdePage> {
   final _host = TextEditingController(text: 'scion.local');
   SharedPreferences? _prefs;
   int _slot = 0;
-  bool _fast = false, _showAsm = true, _busy = false, _dirty = false;
+  bool _fast = false,
+      _showAsm = true,
+      _showIo = true,
+      _busy = false,
+      _dirty = false;
   int _cursorLine = 1;
+  double _asmW = 420;
   String? _file;
   StageAnalysis? _analysis;
   Timer? _debounce, _knobSend;
@@ -69,6 +75,8 @@ class _IdePageState extends State<IdePage> {
       _slot = p.getInt('slot') ?? slot;
       _fast = p.getBool('fast') ?? false;
       _showAsm = p.getBool('asm') ?? true;
+      _showIo = p.getBool('io') ?? true;
+      _asmW = p.getDouble('asmW') ?? 420;
       _host.text = p.getString('host') ?? 'scion.local';
       _file = p.getString('file');
     });
@@ -286,14 +294,30 @@ class _IdePageState extends State<IdePage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_showIo) ...[
+                    SizedBox(
+                      width: 250,
+                      child: IoPane(
+                          source: _code.text,
+                          slot: _slot,
+                          onInsert: _insert,
+                          onJump: _jumpToLine),
+                    ),
+                    Container(width: 1, color: Colors.black38),
+                  ],
                   Expanded(
-                    flex: 3,
-                    child: CodeEditor(controller: _code, analysis: _analysis),
+                    child: CodeEditor(
+                        controller: _code, analysis: _analysis, slot: _slot),
                   ),
                   if (_showAsm) ...[
-                    Container(width: 1, color: Colors.black38),
-                    Expanded(
-                      flex: 2,
+                    _DragDivider(
+                        onDrag: (dx) {
+                          setState(
+                              () => _asmW = (_asmW - dx).clamp(220.0, 1400.0));
+                        },
+                        onEnd: () => _prefs?.setDouble('asmW', _asmW)),
+                    SizedBox(
+                      width: _asmW,
                       child: AsmPane(
                           analysis: _analysis,
                           cursorLine: _cursorLine,
@@ -360,6 +384,14 @@ class _IdePageState extends State<IdePage> {
           ),
           const SizedBox(width: 6),
           _Toggle(
+              label: 'I/O',
+              on: _showIo,
+              onTap: () {
+                setState(() => _showIo = !_showIo);
+                _prefs?.setBool('io', _showIo);
+              }),
+          const SizedBox(width: 6),
+          _Toggle(
               label: 'ASM',
               on: _showAsm,
               onTap: () {
@@ -418,7 +450,6 @@ class _IdePageState extends State<IdePage> {
 
   Widget _sidePanel() {
     final a = _analysis;
-    final st = a?.stage;
     return Container(
       color: Sc.background,
       child: ListView(
@@ -463,8 +494,6 @@ class _IdePageState extends State<IdePage> {
                     ],
                   ),
           ),
-          if (_slot == 1 && st != null && st.outMap.isNotEmpty)
-            _Card(title: '@out map', child: _outMap(st)),
           _Card(
             title: 'Knobs',
             child: Column(
@@ -591,36 +620,6 @@ class _IdePageState extends State<IdePage> {
     );
   }
 
-  Widget _outMap(CompiledStage st) {
-    const modes = ['raw', 'gain', 'add', 'unit', 'strobe'];
-    final regs = {
-      for (final r in registers.values) '${r.reg}/${r.mask}/${r.shift}': r.name
-    };
-    return Column(
-      children: [
-        for (final e in st.outMap)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(children: [
-              SizedBox(
-                  width: 28,
-                  child: Text('o${e.slot}',
-                      style: Sc.uiText(13, color: Sc.primary))),
-              Expanded(
-                child: Text(
-                    regs['${e.reg}/${e.mask}/${e.shift}'] ??
-                        '0x${e.reg.toRadixString(16).padLeft(4, '0')}',
-                    style: Sc.uiText(13, color: Sc.text),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text('${modes[e.mode]}  0x${e.mask.toRadixString(16)}',
-                  style: Sc.uiText(12.5, color: Sc.caption)),
-            ]),
-          ),
-      ],
-    );
-  }
-
   Widget _statusBar() {
     final a = _analysis;
     final err = a?.diagnostics.where((d) => d.isError).length ?? 0;
@@ -644,6 +643,16 @@ class _IdePageState extends State<IdePage> {
         ],
       ),
     );
+  }
+
+  /// Inserts [text] at the cursor (from the I/O pane).
+  void _insert(String text) {
+    final sel = _code.selection;
+    final at = sel.isValid ? sel.start : _code.text.length,
+        end = sel.isValid ? sel.end : at;
+    _code.value = TextEditingValue(
+        text: _code.text.replaceRange(at, end, text),
+        selection: TextSelection.collapsed(offset: at + text.length));
   }
 
   /// Puts the cursor at the start of source line [line] (from the assembly pane).
@@ -808,6 +817,26 @@ class _UploadButton extends StatelessWidget {
                       color: enabled ? Colors.black : const Color(0xFF74747C),
                       weight: FontWeight.w700)),
             ]),
+          ),
+        ),
+      );
+}
+
+/// A vertical splitter: drag to resize the pane on its right.
+class _DragDivider extends StatelessWidget {
+  final ValueChanged<double> onDrag;
+  final VoidCallback onEnd;
+  const _DragDivider({required this.onDrag, required this.onEnd});
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
+          onHorizontalDragEnd: (_) => onEnd(),
+          child: SizedBox(
+            width: 7,
+            child: Center(child: Container(width: 1, color: Colors.black38)),
           ),
         ),
       );

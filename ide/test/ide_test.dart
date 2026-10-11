@@ -95,4 +95,53 @@ void main() {
     expect(find.text('out0_csc_y0'), findsOneWidget);
     await _shot(tester, 'scan_map');
   });
+
+  testWidgets('autocomplete: typing opens the list, Enter accepts', (tester) async {
+    SharedPreferences.setMockInitialValues({'draft': 'let a = in.u;\n', 'slot': 0});
+    tester.view.physicalSize = const Size(1440, 880);
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpWidget(RepaintBoundary(key: _root, child: const ShaderIde()));
+    await _settle(tester);
+    final editor = find.descendant(of: find.byType(CodeEditor), matching: find.byType(TextField));
+    await tester.showKeyboard(editor);
+    Future<void> type(String text) async {
+      tester.testTextInput.updateEditingValue(TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length)));
+      await tester.pump();
+    }
+
+    await type('let a = in.u;\nout.dx = a * s');
+    expect(find.text('sin(x)'), findsOneWidget);
+    expect(find.text('smoothstep(e0, e1, x)'), findsOneWidget);
+    await _shot(tester, 'autocomplete');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter); // the first: sin
+    await tester.pump();
+    final tf = tester.widget<TextField>(editor);
+    expect(tf.controller!.text, 'let a = in.u;\nout.dx = a * sin()');
+    expect(tf.controller!.selection.baseOffset, 'let a = in.u;\nout.dx = a * sin('.length);
+    expect(find.text('smoothstep(e0, e1, x)'), findsNothing);
+    // in. lists the inputs; arrows move, Escape closes
+    await type('let a = in.u;\nout.dx = a * sin(in.');
+    expect(find.text('frame'), findsOneWidget); // in the list (rows past the 8th are built when scrolled to)
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.text('motion at the point (flow on), else 0'), findsOneWidget); // only the I/O pane now
+  });
+
+  testWidgets('the I/O pane follows the stage; the asm divider drags', (tester) async {
+    SharedPreferences.setMockInitialValues({'draft': '@out gy out0_csc_y0 gain\n@out sw in_swap\nout.gy = in.v;\n', 'slot': 1});
+    tester.view.physicalSize = const Size(1440, 880);
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpWidget(RepaintBoundary(key: _root, child: const ShaderIde()));
+    await _settle(tester);
+    expect(find.text('out.gy'), findsOneWidget);
+    expect(find.text('declared, never written'), findsOneWidget); // sw
+    expect(find.text('in.p0'), findsOneWidget); // scan stage inputs
+    expect(find.text('in.heat'), findsNothing);
+    final asm = find.byType(AsmPane);
+    final w0 = tester.getSize(asm).width;
+    await tester.drag(find.byWidgetPredicate((w) => w.runtimeType.toString() == '_DragDivider'), const Offset(-150, 0));
+    await tester.pump();
+    expect(tester.getSize(asm).width, closeTo(w0 + 150, 1));
+    await _shot(tester, 'io_scan');
+  });
 }

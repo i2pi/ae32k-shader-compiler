@@ -6,6 +6,7 @@ import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'completion.dart';
 import 'theme.dart';
 
 class CodeController extends TextEditingController {
@@ -102,10 +103,14 @@ class CodeEditor extends StatefulWidget {
   final CodeController controller;
   final StageAnalysis? analysis;
   final double fontSize;
+
+  /// The stage being edited (0 warp, 1 scan, 2 vertex), for completions.
+  final int slot;
   const CodeEditor(
       {super.key,
       required this.controller,
       required this.analysis,
+      this.slot = 0,
       this.fontSize = 14});
 
   @override
@@ -115,6 +120,67 @@ class CodeEditor extends StatefulWidget {
 class _CodeEditorState extends State<CodeEditor> {
   final _vScroll = ScrollController(), _hScroll = ScrollController();
   final _focus = FocusNode();
+  static const _gutterW = 112.0, _padLeft = 14.0, _padTop = 8.0;
+
+  // autocompletion: shown while typing, from completion.dart
+  CompletionResult? _comp;
+  int _compSel = 0;
+  String _lastText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _lastText = widget.controller.text;
+    widget.controller.addListener(_onChange);
+  }
+
+  void _onChange() {
+    final c = widget.controller, text = c.text, sel = c.selection;
+    final typed = text != _lastText;
+    final grew = text.length > _lastText.length;
+    _lastText = text;
+    if (!sel.isValid || !sel.isCollapsed) return _hide();
+    if (!typed) {
+      // a cursor move: keep the list only while the cursor stays in the word being completed
+      final r = _comp;
+      if (r != null &&
+          (sel.baseOffset < r.start || sel.baseOffset > text.length)) {
+        _hide();
+      }
+      return;
+    }
+    if (!grew && _comp == null) {
+      return; // deleting does not open the list, but narrows it
+    }
+    final r = complete(text, sel.baseOffset, widget.slot);
+    if (r == null || r.items.isEmpty) return _hide();
+    setState(() {
+      _comp = r;
+      _compSel = 0;
+    });
+  }
+
+  void _hide() {
+    if (_comp != null) setState(() => _comp = null);
+  }
+
+  void _accept(Completion item) {
+    final c = widget.controller, r = _comp!, at = c.selection.baseOffset;
+    final t = c.text.replaceRange(r.start, at, item.insert);
+    _comp = null;
+    c.value = TextEditingValue(
+        text: t,
+        selection: TextSelection.collapsed(
+            offset: r.start + (item.caret ?? item.insert.length)));
+    _lastText = t;
+    // `in.` / `out.` open the next list straight away
+    if (item.insert.endsWith('.')) {
+      final n = complete(t, r.start + item.insert.length, widget.slot);
+      if (n != null && n.items.isNotEmpty) _comp = n;
+    }
+    setState(() => _compSel = 0);
+    _focus.requestFocus();
+  }
 
   double get _lineHeight => (widget.fontSize * 1.5).roundToDouble();
 
@@ -127,6 +193,7 @@ class _CodeEditorState extends State<CodeEditor> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onChange);
     _vScroll.dispose();
     _hScroll.dispose();
     _focus.dispose();
@@ -140,6 +207,27 @@ class _CodeEditorState extends State<CodeEditor> {
     }
     final c = widget.controller, sel = c.selection;
     if (!sel.isValid) return KeyEventResult.ignored;
+    final comp = _comp;
+    if (comp != null) {
+      final k = ev.logicalKey;
+      if (k == LogicalKeyboardKey.arrowDown ||
+          k == LogicalKeyboardKey.arrowUp) {
+        setState(() => _compSel =
+            (_compSel + (k == LogicalKeyboardKey.arrowDown ? 1 : -1)) %
+                comp.items.length);
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.enter ||
+          k == LogicalKeyboardKey.numpadEnter ||
+          k == LogicalKeyboardKey.tab) {
+        _accept(comp.items[_compSel.clamp(0, comp.items.length - 1)]);
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.escape) {
+        _hide();
+        return KeyEventResult.handled;
+      }
+    }
     String? insert;
     if (ev.logicalKey == LogicalKeyboardKey.tab) {
       insert = '  ';
@@ -178,15 +266,18 @@ class _CodeEditorState extends State<CodeEditor> {
         };
         // no wrapping (the gutter is one row per line): the text is as wide as its widest line,
         // measured in the editor's own style, with room for italics and the caret
-        final widest = lines.fold('', (String w, l) => l.length > w.length ? l : w);
+        final widest =
+            lines.fold('', (String w, l) => l.length > w.length ? l : w);
         final measured = (TextPainter(
-                text: TextSpan(text: widest, style: _mono.copyWith(fontStyle: FontStyle.italic)),
+                text: TextSpan(
+                    text: widest,
+                    style: _mono.copyWith(fontStyle: FontStyle.italic)),
                 textDirection: TextDirection.ltr,
                 maxLines: 1)
               ..layout())
             .width;
         return LayoutBuilder(builder: (context, box) {
-          const gutterW = 112.0;
+          const gutterW = _gutterW;
           final textW = max(box.maxWidth - gutterW, measured * 1.08 + 64);
           return Stack(children: [
             // the gutter's background fills the view, however short the file
@@ -205,7 +296,7 @@ class _CodeEditorState extends State<CodeEditor> {
                   children: [
                     Container(
                       width: gutterW,
-                      padding: const EdgeInsets.only(top: 8, bottom: 200),
+                      padding: const EdgeInsets.only(top: _padTop, bottom: 200),
                       child: Column(
                         children: [
                           for (var i = 1; i <= lines.length; i++)
@@ -253,8 +344,8 @@ class _CodeEditorState extends State<CodeEditor> {
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
                                   isCollapsed: true,
-                                  contentPadding:
-                                      EdgeInsets.fromLTRB(14, 8, 14, 200),
+                                  contentPadding: EdgeInsets.fromLTRB(
+                                      _padLeft, _padTop, 14, 200),
                                 ),
                               ),
                             ),
@@ -266,11 +357,117 @@ class _CodeEditorState extends State<CodeEditor> {
                 ),
               ),
             ),
+            if (_comp != null) _dropdown(src, box),
           ]);
         });
       },
     );
   }
+
+  /// The completion list, just below the start of the word being completed.
+  Widget _dropdown(String src, BoxConstraints box) {
+    final r = _comp!;
+    final lineStart = src.lastIndexOf('\n', r.start - 1) + 1;
+    final line = '\n'.allMatches(src.substring(0, lineStart)).length;
+    final x = (TextPainter(
+            text:
+                TextSpan(text: src.substring(lineStart, r.start), style: _mono),
+            textDirection: TextDirection.ltr,
+            maxLines: 1)
+          ..layout())
+        .width;
+    const rowH = 26.0, w = 420.0;
+    final shown = min(r.items.length, 8);
+    return ListenableBuilder(
+      listenable: Listenable.merge([_vScroll, _hScroll]),
+      builder: (context, _) {
+        final v = _vScroll.hasClients ? _vScroll.offset : 0.0,
+            h = _hScroll.hasClients ? _hScroll.offset : 0.0;
+        var top = _padTop + (line + 1) * _lineHeight - v + 2;
+        if (top + shown * rowH > box.maxHeight) {
+          top = top - _lineHeight - shown * rowH - 4; // flip above
+        }
+        final left = (_gutterW + _padLeft + x - h - 30)
+            .clamp(0.0, max(0.0, box.maxWidth - w))
+            .toDouble();
+        return Positioned(
+          left: left,
+          top: top,
+          width: w,
+          height: shown * rowH + 6,
+          child: Material(
+            color: const Color(0xFF2E2F34),
+            elevation: 3,
+            shadowColor: Colors.black54,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.10))),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              itemExtent: rowH,
+              itemCount: r.items.length,
+              itemBuilder: (context, i) {
+                final it = r.items[i], on = i == _compSel;
+                return GestureDetector(
+                  onTapDown: (_) => _accept(it),
+                  child: Container(
+                    color: on ? Sc.blue.withValues(alpha: 0.28) : null,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(children: [
+                      Container(
+                        width: 18,
+                        alignment: Alignment.center,
+                        child: Text(_kindLetter(it.kind),
+                            style: Sc.caps(10.5,
+                                color: _kindColor(it.kind),
+                                weight: FontWeight.w700)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(it.label,
+                          style: _mono.copyWith(
+                              fontSize: 13,
+                              height: 1.0,
+                              color: _kindColor(it.kind))),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(it.detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Sc.uiText(12, color: on ? Sc.body : Sc.faint)),
+                      ),
+                    ]),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static String _kindLetter(CompletionKind k) => switch (k) {
+        CompletionKind.keyword => 'K',
+        CompletionKind.function => 'F',
+        CompletionKind.constant => 'C',
+        CompletionKind.local => 'L',
+        CompletionKind.input => 'IN',
+        CompletionKind.output => 'OUT',
+        CompletionKind.register => 'R',
+        CompletionKind.mode => 'M',
+      };
+
+  static Color _kindColor(CompletionKind k) => switch (k) {
+        CompletionKind.keyword => Sc.token(TokenKind.keyword),
+        CompletionKind.function => Sc.token(TokenKind.function),
+        CompletionKind.constant => Sc.token(TokenKind.constant),
+        CompletionKind.local => Sc.token(TokenKind.local),
+        CompletionKind.input => Sc.token(TokenKind.input),
+        CompletionKind.output => Sc.token(TokenKind.output),
+        CompletionKind.register => Sc.token(TokenKind.register),
+        CompletionKind.mode => Sc.token(TokenKind.mode),
+      };
 }
 
 class _GutterRow extends StatelessWidget {

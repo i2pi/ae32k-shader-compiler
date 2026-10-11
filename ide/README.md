@@ -10,7 +10,19 @@ built on the `ae32k_shader_compiler` package. As you type it:
   cycles in the gutter (mean per evaluation, including the runtime routines the line calls;
   `*` marks a line inside an `if` that does not always run), plus the stage's total, its range,
   the share of a video line, and the blob size against the 4 KB limit;
-- shows the generated assembly in a pane beside the source (**ASM** hides it):
+- completes as you type, in a dropdown at the cursor:
+  - after `in.`, the stage's inputs; after `out.`, its outputs (a scan stage's own `@out` names);
+  - on an `@out` line, register names from registers.inc and then modes;
+  - otherwise keywords, functions with their signatures, constants and your locals;
+  - Up/Down choose, Enter or Tab accepts, Esc closes;
+- lists what the stage can use in the **I/O** pane:
+  - its outputs, for a scan stage each `@out` name with its register fields, modes and measured
+    granularity, flagging names that are declared but never written;
+  - the inputs this stage gets, highlighting the ones the code uses and flagging inputs it reads
+    that this stage does not set;
+  - clicking an entry inserts it;
+- shows the generated assembly in a pane beside the source (**ASM** hides it; drag the divider
+  to resize it):
   - each instruction has its address, its mean cycles per evaluation and the source line it
     came from;
   - the instructions of the line under the cursor are highlighted and scrolled into view;
