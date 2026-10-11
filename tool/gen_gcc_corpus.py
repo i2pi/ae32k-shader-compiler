@@ -7,8 +7,9 @@ compiler's output is held to the same reference.
 Uses shader.py's own code generator, but compiles in a private directory: never
 tools/imcu/build/, which the device workflow uploads from.
 
-  python3 tool/gen_gcc_corpus.py [--random N] [--seed S]
-Writes <name>.ss, <name>.bin and manifest.txt ("name<TAB>slot<TAB>bytes").
+  python3 tool/gen_gcc_corpus.py [--random N] [--seed S] [--src DIR --out DIR]
+Writes <name>.ss, <name>.bin and manifest.txt ("name<TAB>slot<TAB>bytes"). With --src, the
+stages in DIR only (e.g. tools/imcu/examples/corpus, for tool/bench.dart), no random ones.
 """
 import os, random, shutil, sys, tempfile
 
@@ -62,18 +63,21 @@ def rprog(rng):
 
 def main():
     args = sys.argv[1:]
-    n = int(args[args.index("--random") + 1]) if "--random" in args else 120
+    src_dir = os.path.abspath(args[args.index("--src") + 1]) if "--src" in args else os.path.join(IMCU, "examples")
+    out = os.path.abspath(args[args.index("--out") + 1]) if "--out" in args else OUT
+    n = int(args[args.index("--random") + 1]) if "--random" in args else (0 if "--src" in args else 120)
     seed = int(args[args.index("--seed") + 1]) if "--seed" in args else 1
     work = tempfile.mkdtemp(prefix="ae32k_gcc_")
     for f in ("stage.h", "stage.ld"):
         shutil.copy(os.path.join(IMCU, f), work)
     shader.HERE = work  # compile_source builds in HERE/build and reads HERE/stage.ld
-    os.makedirs(OUT, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
     jobs = []
-    for f in sorted(os.listdir(os.path.join(IMCU, "examples"))):
+    for f in sorted(os.listdir(src_dir)):
         if f.endswith(".ss"):
-            src = open(os.path.join(IMCU, "examples", f)).read()
-            slot = 2 if f.startswith("verts") else (1 if "@out" in src or f.startswith(("scan", "frag")) else 0)
+            src = open(os.path.join(src_dir, f)).read()
+            vert = f.startswith("verts") or (f[0] == "v" and f[1:3].isdigit())
+            slot = 2 if vert else (1 if "@out" in src or f.startswith(("scan", "frag")) or (f[0] == "s" and f[1:3].isdigit()) else 0)
             jobs.append((f[:-3], src, slot))
     rng = random.Random(seed)
     for i in range(n):
@@ -89,11 +93,11 @@ def main():
             print(f"skip {name}: {str(e).splitlines()[0][:100]}")
             continue
         blob = b"".join(w.to_bytes(4, "little") for w in words)
-        open(os.path.join(OUT, name + ".ss"), "w").write(src)
-        open(os.path.join(OUT, name + ".bin"), "wb").write(blob)
+        open(os.path.join(out, name + ".ss"), "w").write(src)
+        open(os.path.join(out, name + ".bin"), "wb").write(blob)
         manifest.append(f"{name}\t{slot}\t{len(blob)}")
         print(f"{name}: slot {slot}, {nbytes} bytes", flush=True)
-    open(os.path.join(OUT, "manifest.txt"), "w").write("\n".join(manifest) + "\n")
+    open(os.path.join(out, "manifest.txt"), "w").write("\n".join(manifest) + "\n")
     shutil.rmtree(work)
     print(f"{len(manifest)} blobs")
 

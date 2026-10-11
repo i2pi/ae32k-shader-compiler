@@ -30,7 +30,9 @@ Results stay bit-exact with shader.py's C (in `--fast` mode, with the same C min
 - Constant subexpressions are folded with the reference; comparisons, `&&`/`||`, `abs`, `min`,
   `max`, `clamp`, `floor`, `frac`, `step`, `sign` and `lerp` are inline.
 
-`tool/profile.dart file.ss [--fast]` shows where the cycles go (per runtime routine).
+`tool/profile.dart file.ss [--fast]` shows where the cycles go (per runtime routine);
+`tool/corpus_profile.dart DIR` sums that over a set. `docs/BENCHMARK.md` (from `tool/bench.dart`)
+compares size and cycles with gcc for every example and the 40-stage corpus.
 
 ## How it is checked
 

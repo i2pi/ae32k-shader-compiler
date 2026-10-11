@@ -1,48 +1,147 @@
-// Native compiler vs gcc on the corpus: blob size and emulated cycles per evaluation
-// (mean over the same random inputs). The cycle model is the emulator's estimate, not
-// a hardware measurement.
-//   dart run tool/bench.dart
+// gcc vs native: blob size and cycles per call, written as a markdown report.
+//
+//   python3 tool/gen_gcc_corpus.py --src ../../tools/imcu/examples/corpus --out build/gcc_corpus
+//   dart run tool/bench.dart [--device hw_bench.log] [--out docs/BENCHMARK.md]
+//
+// gcc blobs: test/golden/gcc (the examples, built by shader.py + Wine gcc) and build/gcc_corpus
+// (the 40-stage corpus). Cycles: the emulator's device-fitted model (docs/AE32000_ISA.md,
+// "Timing"), mean over the same realistic inputs for every build; every build's outputs are
+// checked against the reference first. --device adds the rows `tool/hw_bench.dart --stages`
+// measured on the MDIN core (one fixed input per stage).
 import 'dart:io';
 import 'dart:math';
 
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
 import 'package:ae32k_shader_compiler/src/emu.dart';
+import 'package:ae32k_shader_compiler/src/lang/eval.dart';
+import 'package:ae32k_shader_compiler/src/lang/parser.dart';
 
-import '../test/emu_gcc_test.dart' show randomInputs;
+const runs = 60;
 
-void main() {
-  final dir = 'test/golden/gcc';
-  var sumG = 0.0, sumN = 0.0, sizeG = 0, sizeN = 0, n = 0;
-  final rows = <String>[];
-  for (final line in File('$dir/manifest.txt').readAsLinesSync().where((l) => l.isNotEmpty)) {
-    final f = line.split('\t');
-    final name = f[0], slot = int.parse(f[1]);
-    final gccBlob = File('$dir/$name.bin').readAsBytesSync();
-    final nat = compileStage(File('$dir/$name.ss').readAsStringSync(), slot: slot);
-    final g = StageRunner(gccBlob, slot: slot), t = StageRunner(nat.bytes, slot: slot);
-    final rng = Random(7);
-    var cg = 0, cn = 0;
-    const runs = 50;
-    for (var k = 0; k < runs; k++) {
-      final inp = randomInputs(rng);
-      final sg = <String, int>{}, sn = <String, int>{};
-      g.run(inp, stats: sg);
-      t.run(inp, stats: sn);
-      cg += sg['cycles']!;
-      cn += sn['cycles']!;
+Map<String, int> realistic(Random rng) => {
+      'x': rng.nextInt(1920) << 16, 'y': rng.nextInt(1080) << 16, 'u': rng.nextInt(65536), 'v': rng.nextInt(65536),
+      't': rng.nextInt(600 << 16), 'frame': rng.nextInt(36000) << 16, 'rnd': rng.nextInt(65536),
+      'w': 1920 << 16, 'h': 1080 << 16,
+      for (var j = 0; j < 8; j++) 'k$j': rng.nextInt(4 << 16),
+      for (var j = 0; j < 4; j++) 'p$j': rng.nextInt(64 << 16),
+    };
+
+class Row {
+  final String name, set;
+  final int slot, gB, nB, fB;
+  final double gC, nC, fC;
+  Row(this.name, this.set, this.slot, this.gB, this.nB, this.fB, this.gC, this.nC, this.fC);
+}
+
+double cycles(List<int> blob, int slot, String src, bool fast) {
+  final prog = parse(src);
+  final runner = StageRunner(blob, slot: slot);
+  final init = List.filled(16, 0);
+  for (final e in prog.outMap) {
+    if (e.mode == 1) init[e.slot] = 65536;
+  }
+  final rng = Random(7);
+  var total = 0;
+  for (var k = 0; k < runs; k++) {
+    final inp = realistic(rng);
+    final st = <String, int>{};
+    final got = runner.run(inp, outInit: init, stats: st);
+    final want = evaluate(prog, inp, init, fast);
+    if (got.join(',') != want.join(',')) throw StateError('outputs differ from the reference');
+    total += st['cycles']!;
+  }
+  return total / runs;
+}
+
+String pct(double a, double b) => '${(a / b).toStringAsFixed(2)}x';
+
+void main(List<String> args) {
+  String? opt(String n) => args.contains(n) ? args[args.indexOf(n) + 1] : null;
+  final rows = <Row>[];
+  for (final (dir, set) in [('test/golden/gcc', 'examples'), ('build/gcc_corpus', 'corpus')]) {
+    final man = File('$dir/manifest.txt');
+    if (!man.existsSync()) {
+      stderr.writeln('no $dir (see the header for how to build it)');
+      continue;
     }
-    sumG += cg / runs;
-    sumN += cn / runs;
-    sizeG += gccBlob.length;
-    sizeN += nat.bytes.length;
-    n++;
-    if (!name.startsWith('rand')) {
-      rows.add('${name.padRight(12)} ${'${gccBlob.length}'.padLeft(6)} ${'${nat.bytes.length}'.padLeft(6)}'
-          ' ${(cg / runs).toStringAsFixed(0).padLeft(8)} ${(cn / runs).toStringAsFixed(0).padLeft(8)}'
-          ' ${(cg / cn).toStringAsFixed(2).padLeft(6)}x');
+    for (final line in man.readAsLinesSync().where((l) => l.isNotEmpty)) {
+      final f = line.split('\t');
+      final name = f[0], slot = int.parse(f[1]);
+      if (name.startsWith('rand')) continue; // random programs test correctness, not speed
+      final src = File('$dir/$name.ss').readAsStringSync();
+      final gcc = File('$dir/$name.bin').readAsBytesSync();
+      final nat = compileStage(src, slot: slot).bytes, fst = compileStage(src, slot: slot, fast: true).bytes;
+      try {
+        rows.add(Row(name, set, slot, gcc.length, nat.length, fst.length, cycles(gcc, slot, src, false),
+            cycles(nat, slot, src, false), cycles(fst, slot, src, true)));
+      } on Object catch (e) {
+        stderr.writeln('$name: $e');
+      }
     }
   }
-  print('${'stage'.padRight(12)} ${'gcc B'.padLeft(6)} ${'ours B'.padLeft(6)} ${'gcc cyc'.padLeft(8)} ${'our cyc'.padLeft(8)} speedup');
-  rows.forEach(print);
-  print('all $n programs: size ${sizeG ~/ n} -> ${sizeN ~/ n} B mean, cycles ${(sumG / n).toStringAsFixed(0)} -> ${(sumN / n).toStringAsFixed(0)} mean');
+
+  final out = StringBuffer()
+    ..writeln('# gcc vs native')
+    ..writeln()
+    ..writeln('Generated by `tool/bench.dart`. gcc = `tools/imcu/shader.py` -> C -> ae32000-elf-gcc -O2 (Wine);')
+    ..writeln('native = this compiler, exact (bit-identical results) and `--fast` (overflow wraps).')
+    ..writeln('Cycles per call from the emulator\'s device-fitted model, mean over $runs realistic inputs')
+    ..writeln('(pixel x/y, u/v in [0,1), t < 600 s, knobs < 4); every build\'s outputs were checked against')
+    ..writeln('the reference. The model is within ~5% of the device for native code and reads gcc\'s')
+    ..writeln('loop-heavy code 5-10% high; the device rows at the end are measured.')
+    ..writeln();
+  for (final set in ['examples', 'corpus']) {
+    final rs = rows.where((r) => r.set == set).toList();
+    if (rs.isEmpty) continue;
+    out
+      ..writeln('## ${set == 'examples' ? 'Examples (tools/imcu/examples)' : 'Corpus (tools/imcu/examples/corpus, 40 stages)'}')
+      ..writeln()
+      ..writeln('| stage | slot | gcc B | native B | fast B | gcc cyc | native cyc | fast cyc | speed-up | fast speed-up |')
+      ..writeln('|---|---|---:|---:|---:|---:|---:|---:|---:|---:|');
+    for (final r in rs) {
+      out.writeln('| ${r.name} | ${r.slot} | ${r.gB} | ${r.nB} | ${r.fB} | ${r.gC.toStringAsFixed(0)} | '
+          '${r.nC.toStringAsFixed(0)} | ${r.fC.toStringAsFixed(0)} | ${pct(r.gC, r.nC)} | ${pct(r.gC, r.fC)} |');
+    }
+    double mean(double Function(Row) f) => rs.map(f).reduce((a, b) => a + b) / rs.length;
+    double geo(double Function(Row) f) => exp(rs.map((r) => log(f(r))).reduce((a, b) => a + b) / rs.length);
+    out
+      ..writeln('| **mean** | | **${mean((r) => r.gB.toDouble()).toStringAsFixed(0)}** | '
+          '**${mean((r) => r.nB.toDouble()).toStringAsFixed(0)}** | **${mean((r) => r.fB.toDouble()).toStringAsFixed(0)}** | '
+          '**${mean((r) => r.gC).toStringAsFixed(0)}** | **${mean((r) => r.nC).toStringAsFixed(0)}** | '
+          '**${mean((r) => r.fC).toStringAsFixed(0)}** | **${geo((r) => r.gC / r.nC).toStringAsFixed(2)}x** (geo) | '
+          '**${geo((r) => r.gC / r.fC).toStringAsFixed(2)}x** (geo) |')
+      ..writeln();
+  }
+
+  final dev = opt('--device');
+  if (dev != null) {
+    // stage/kind  emu  hw  match   (hw_bench --stages)
+    final hw = <String, Map<String, double>>{};
+    for (final l in File(dev).readAsLinesSync()) {
+      final m = RegExp(r'^(\S+)/(native|fast|gcc)\s+\d+\s+([\d.]+)\s+match').firstMatch(l);
+      if (m != null) (hw[m[1]!] ??= {})[m[2]!] = double.parse(m[3]!);
+    }
+    final both = hw.entries.where((e) => e.value.containsKey('gcc')).toList();
+    out
+      ..writeln('## Measured on the device')
+      ..writeln()
+      ..writeln('`tool/hw_bench.dart --stages` through the resident\'s `imcu hybrun a` hook, slot 0, one fixed')
+      ..writeln('input (x 960, y 540, t 1.0), call overhead subtracted. Only stages with a gcc blob for slot 0.')
+      ..writeln()
+      ..writeln('| stage | gcc cyc | native cyc | fast cyc | speed-up | fast speed-up |')
+      ..writeln('|---|---:|---:|---:|---:|---:|');
+    for (final e in both) {
+      final g = e.value['gcc']!, n = e.value['native']!, f = e.value['fast']!;
+      out.writeln('| ${e.key} | ${g.toStringAsFixed(0)} | ${n.toStringAsFixed(0)} | ${f.toStringAsFixed(0)} | '
+          '${pct(g, n)} | ${pct(g, f)} |');
+    }
+    out.writeln();
+  }
+  final path = opt('--out');
+  if (path != null) {
+    File(path).writeAsStringSync(out.toString());
+    stdout.writeln('wrote $path (${rows.length} stages)');
+  } else {
+    stdout.write(out);
+  }
 }
