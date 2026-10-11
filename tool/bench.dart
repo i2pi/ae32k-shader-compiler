@@ -125,7 +125,8 @@ void main(List<String> args) {
     out
       ..writeln('## Measured on the device')
       ..writeln()
-      ..writeln('`tool/hw_bench.dart --stages` through the resident\'s `imcu hybrun a` hook, slot 0, one fixed')
+      ..writeln('From `$dev` (`tool/hw_bench.dart --stages`, so the native code of that run\'s commit), through')
+      ..writeln('the resident\'s `imcu hybrun a` hook, slot 0, one fixed')
       ..writeln('input (x 960, y 540, t 1.0), call overhead subtracted. Only stages with a gcc blob for slot 0.')
       ..writeln()
       ..writeln('| stage | gcc cyc | native cyc | fast cyc | speed-up | fast speed-up |')

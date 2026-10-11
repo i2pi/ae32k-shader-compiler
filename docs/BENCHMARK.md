@@ -14,7 +14,7 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | frag1 | 1 | 1576 | 180 | 180 | 89 | 87 | 87 | 1.02x | 1.02x |
 | frag2 | 1 | 1800 | 228 | 136 | 137 | 123 | 103 | 1.11x | 1.33x |
 | frag3 | 1 | 1520 | 124 | 108 | 64 | 60 | 55 | 1.07x | 1.16x |
-| glitch | 0 | 3748 | 1856 | 1456 | 1988 | 1087 | 939 | 1.83x | 2.12x |
+| glitch | 0 | 3748 | 1808 | 1396 | 1988 | 1015 | 862 | 1.96x | 2.30x |
 | ripple | 0 | 2304 | 744 | 700 | 2422 | 707 | 674 | 3.42x | 3.59x |
 | scan1 | 1 | 2896 | 1360 | 1156 | 2498 | 797 | 696 | 3.13x | 3.59x |
 | scan2 | 1 | 2312 | 644 | 404 | 1290 | 321 | 218 | 4.02x | 5.92x |
@@ -23,7 +23,7 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | verts3 | 2 | 2240 | 616 | 420 | 3978 | 273 | 200 | 14.57x | 19.89x |
 | verts_test | 2 | 1796 | 256 | 112 | 2896 | 111 | 50 | 26.08x | 57.91x |
 | xtest | 1 | 1820 | 260 | 84 | 1036 | 111 | 35 | 9.33x | 29.59x |
-| **mean** | | **2264** | **661** | **501** | **1826** | **375** | **311** | **3.97x** (geo) | **5.38x** (geo) |
+| **mean** | | **2264** | **657** | **496** | **1826** | **369** | **305** | **3.99x** (geo) | **5.42x** (geo) |
 
 ## Corpus (tools/imcu/examples/corpus, 40 stages)
 
@@ -33,7 +33,7 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | s02_csc_gain_rows | 1 | 1896 | 348 | 276 | 206 | 186 | 155 | 1.11x | 1.33x |
 | s03_offset_bands | 1 | 1676 | 212 | 124 | 109 | 97 | 64 | 1.12x | 1.71x |
 | s04_palette_cycle | 1 | 1852 | 324 | 288 | 201 | 198 | 183 | 1.02x | 1.10x |
-| s05_wmc_cbcr_swap | 1 | 1548 | 516 | 480 | 457 | 217 | 201 | 2.10x | 2.27x |
+| s05_wmc_cbcr_swap | 1 | 1548 | 468 | 432 | 457 | 193 | 177 | 2.36x | 2.58x |
 | s06_dark_screen_lines | 1 | 1568 | 420 | 376 | 1030 | 216 | 198 | 4.76x | 5.19x |
 | s07_tp_force_green | 1 | 1908 | 652 | 568 | 1160 | 345 | 311 | 3.36x | 3.73x |
 | s08_window_mask | 1 | 1576 | 100 | 56 | 67 | 42 | 24 | 1.60x | 2.79x |
@@ -41,7 +41,7 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | s10_bw_extension | 1 | 1596 | 176 | 136 | 93 | 88 | 72 | 1.06x | 1.29x |
 | s11_selective_colour | 1 | 1684 | 176 | 176 | 117 | 84 | 84 | 1.39x | 1.39x |
 | s12_csc2_coef_gain | 1 | 1728 | 256 | 180 | 138 | 120 | 89 | 1.16x | 1.55x |
-| s13_420_pattern | 1 | 1612 | 560 | 520 | 484 | 238 | 222 | 2.03x | 2.18x |
+| s13_420_pattern | 1 | 1612 | 512 | 472 | 484 | 214 | 198 | 2.26x | 2.44x |
 | s14_in_csc_offsets | 1 | 1748 | 216 | 72 | 1067 | 96 | 35 | 11.11x | 30.47x |
 | s15_hdr_bypass | 1 | 1400 | 16 | 16 | 10 | 7 | 7 | 1.43x | 1.43x |
 | s16_front_nr | 1 | 1696 | 144 | 108 | 113 | 63 | 48 | 1.79x | 2.35x |
@@ -52,7 +52,7 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | v01_ripple_grid | 2 | 2340 | 632 | 364 | 3099 | 278 | 176 | 11.15x | 17.61x |
 | v02_spiral | 2 | 2368 | 624 | 360 | 1245 | 292 | 193 | 4.26x | 6.45x |
 | v03_lissajous | 2 | 2348 | 432 | 248 | 345 | 262 | 186 | 1.32x | 1.86x |
-| v04_scatter | 2 | 2076 | 836 | 632 | 2466 | 354 | 270 | 6.97x | 9.13x |
+| v04_scatter | 2 | 2076 | 788 | 584 | 2466 | 330 | 246 | 7.47x | 10.03x |
 | v05_breathing | 2 | 2372 | 592 | 428 | 3117 | 327 | 255 | 9.53x | 12.22x |
 | v06_rotating | 2 | 2568 | 784 | 552 | 3202 | 361 | 283 | 8.88x | 11.31x |
 | v07_wave_columns | 2 | 2152 | 468 | 320 | 3030 | 237 | 176 | 12.78x | 17.22x |
@@ -60,20 +60,21 @@ loop-heavy code 5-10% high; the device rows at the end are measured.
 | v09_rings | 2 | 2648 | 1056 | 844 | 4212 | 499 | 425 | 8.45x | 9.92x |
 | v10_rain | 2 | 2300 | 728 | 452 | 3124 | 309 | 202 | 10.12x | 15.46x |
 | v11_bounce | 2 | 2224 | 588 | 400 | 3057 | 257 | 186 | 11.89x | 16.43x |
-| v12_jitter_checker | 2 | 2484 | 1072 | 852 | 3914 | 613 | 522 | 6.38x | 7.49x |
+| v12_jitter_checker | 2 | 2484 | 1024 | 804 | 3914 | 565 | 474 | 6.92x | 8.25x |
 | v13_phyllotaxis | 2 | 2292 | 568 | 456 | 1434 | 388 | 341 | 3.69x | 4.20x |
 | v14_expanding_squares | 2 | 2468 | 652 | 452 | 4984 | 324 | 237 | 15.40x | 21.03x |
 | v15_zigzag | 2 | 2084 | 388 | 240 | 2988 | 169 | 108 | 17.68x | 27.66x |
-| v16_field_lines | 2 | 2376 | 1068 | 868 | 4659 | 926 | 855 | 5.03x | 5.45x |
+| v16_field_lines | 2 | 2376 | 1356 | 1156 | 4659 | 644 | 574 | 7.24x | 8.12x |
 | v17_two_grids | 2 | 2332 | 604 | 252 | 3993 | 274 | 126 | 14.57x | 31.69x |
 | v18_perspective_floor | 2 | 2164 | 844 | 636 | 3948 | 350 | 266 | 11.29x | 14.85x |
 | v19_shear | 2 | 2468 | 736 | 508 | 4076 | 357 | 265 | 11.42x | 15.38x |
-| v20_noise_falloff | 2 | 2940 | 1592 | 1416 | 4841 | 941 | 856 | 5.15x | 5.65x |
-| **mean** | | **2006** | **505** | **375** | **1833** | **260** | **208** | **3.86x** (geo) | **5.03x** (geo) |
+| v20_noise_falloff | 2 | 2940 | 1536 | 1368 | 4841 | 916 | 832 | 5.29x | 5.82x |
+| **mean** | | **2006** | **506** | **376** | **1833** | **249** | **197** | **3.93x** (geo) | **5.14x** (geo) |
 
 ## Measured on the device
 
-`tool/hw_bench.dart --stages` through the resident's `imcu hybrun a` hook, slot 0, one fixed
+From `docs/hw_bench_d0b55c9.log` (`tool/hw_bench.dart --stages`, so the native code of that run's commit), through
+the resident's `imcu hybrun a` hook, slot 0, one fixed
 input (x 960, y 540, t 1.0), call overhead subtracted. Only stages with a gcc blob for slot 0.
 
 | stage | gcc cyc | native cyc | fast cyc | speed-up | fast speed-up |
