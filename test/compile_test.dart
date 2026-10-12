@@ -6,8 +6,6 @@ import 'dart:math';
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
 import 'package:ae32k_shader_compiler/src/codegen.dart';
 import 'package:ae32k_shader_compiler/src/emu.dart';
-import 'package:ae32k_shader_compiler/src/lang/eval.dart';
-import 'package:ae32k_shader_compiler/src/lang/parser.dart';
 import 'package:test/test.dart';
 
 import 'emu_gcc_test.dart' show randomInputs;

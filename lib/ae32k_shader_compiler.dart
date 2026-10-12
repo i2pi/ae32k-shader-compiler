@@ -15,9 +15,10 @@ export 'src/abi.dart' show slotAddr, maxBlobBytes;
 export 'src/analysis.dart' show analyzeStage, StageAnalysis, Diagnostic, LineCost, sampleInputs;
 export 'src/lang/highlight.dart' show highlight, Highlight, TokenKind;
 export 'src/codegen.dart' show CompileError;
-export 'src/lang/ast.dart' show OutMapEntry;
-export 'src/lang/parser.dart' show ShaderSyntaxError;
-export 'src/osc.dart' show oscMessage, stageParts, knobMessage, scanMapMessage, slotPath;
+export 'src/lang/ast.dart' show OutMapEntry, Program;
+export 'src/lang/eval.dart' show evaluate;
+export 'src/lang/parser.dart' show ShaderSyntaxError, parse;
+export 'src/osc.dart' show oscMessage, oscNoArgTypes, stageParts, knobMessage, scanMapMessage, slotPath;
 export 'src/registers.dart' show Register, parseRegisters, registers;
 
 class CompiledStage {

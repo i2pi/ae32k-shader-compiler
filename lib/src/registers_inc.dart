@@ -121,4 +121,16 @@ out1_cbcr_swap     0x1CA8 0x0010  4 raw    line    OUT1 digital CbCr swap
 out1_tp_force_g    0x1CAC 0x1FFF  0 raw    line    OUT1 test-pattern force G
 out1_winmask_en    0x1CAF 0xF000 12 raw    line    OUT1 window mask enable nibble
 out1_winmask_col   0x1CAF 0x00FF  0 raw    line    OUT1 window mask colour index
+
+
+# ---- tried from the scan engine 2026-10-13 (feature enabled): NOT per pixel; see docs/MIDLINE_REGISTER_SWEEP.md ----
+in_tp_en           0x013D 0x4000 14 raw    frame   input port 0 test pattern generator enable (0x013D = 0xC000 | pattern: 2 h ramp, 3 v ramp, 4 h grey). From the scan engine: the pattern takes over from the first enabled line to the frame end (2026-10-13)
+out0_tp            0x1C01 0x003C  2 raw    line    output CH0 test pattern mode (7 h ramp, 8 wide h ramp, 9 wide v ramp, 11 h+v ramp, 3 cross hatch); a mid-line toggle shows nothing (2026-10-13)
+cdc4_blank_en      0x1F04 0x1000 12 raw    partial input CDC buffer 4 data blank (shows the blank colour below): a full-width cell shows it, ending ~10-40 px early (jitter); a disc shows nothing (2026-10-13)
+cdc4_blank_cr      0x1F2B 0x0FFF  0 raw    partial input CDC buffer 4 blank colour Red/Cr (12 bit)
+cdc4_blank_y       0x1F2C 0x0FFF  0 raw    partial input CDC buffer 4 blank colour Green/Y (12 bit): changes 1-2 times per line at wandering x, not at the written column (2026-10-13)
+cdc4_blank_cb      0x1F2D 0x0FFF  0 raw    partial input CDC buffer 4 blank colour Blue/Cb (12 bit)
+osd_s0_alpha       0x101F 0x000F  0 raw    frame?  output OSD sprite 0 alpha (layer in 0x1000[2:0]; `imcu canvas` uses layer 4), 15 = opaque. Written by the cell engine: the whole sprite disappears (2026-10-13)
+osd_s0_x           0x1020 0x1FFF  0 raw    frame?  output OSD sprite 0 x position (layer in 0x1000[2:0]). Written per cell on rows 400-699 (x 100): the whole sprite sat at x 0 on every line (the map's base value), not hidden (2026-10-13)
+osd_block_g        0x1009 0x00FF  0 raw    frame?  output OSD block (background box) colour, green byte (red 15:8, blue 0x100A); static RGB works; per cell: the box shows the map's base value (black here), no steps (2026-10-13)
 ''';

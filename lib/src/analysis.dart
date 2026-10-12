@@ -6,8 +6,6 @@ import 'dart:math';
 import '../ae32k_shader_compiler.dart';
 import 'asm.dart' show AsmError;
 import 'emu.dart';
-import 'lang/eval.dart';
-import 'lang/parser.dart';
 
 class Diagnostic {
   final String message;

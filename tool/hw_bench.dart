@@ -19,8 +19,6 @@ import 'dart:io';
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
 import 'package:ae32k_shader_compiler/src/asm.dart';
 import 'package:ae32k_shader_compiler/src/emu.dart';
-import 'package:ae32k_shader_compiler/src/lang/eval.dart';
-import 'package:ae32k_shader_compiler/src/lang/parser.dart';
 import 'package:ae32k_shader_compiler/src/runtime.dart';
 
 const slot = 0, base = 0x1000C000;

@@ -16,19 +16,27 @@ List<int> _pad(List<int> b) => [...b, ...List.filled(-b.length % 4 & 3, 0)];
 
 List<int> _str(String s) => _pad([...utf8.encode(s), 0]);
 
-/// One OSC message; [args] are int (i), double (f) or `List<int>` (b), per [types].
+/// The OSC types that carry no argument bytes (true, false, nil).
+const oscNoArgTypes = 'TFN';
+
+/// One OSC message; [args] are int (i), double (f), String (s) or `List<int>` (b), per [types].
+/// T, F and N take no argument.
 Uint8List oscMessage(String address, String types, List<Object> args) {
   final out = <int>[..._str(address), ..._str(',$types')];
-  for (var k = 0; k < types.length; k++) {
-    final a = args[k];
+  var n = 0;
+  for (final t in types.split('')) {
+    if (oscNoArgTypes.contains(t)) continue;
+    final a = args[n++];
     final bd = ByteData(4);
-    switch (types[k]) {
+    switch (t) {
       case 'i':
         bd.setInt32(0, a as int);
         out.addAll(bd.buffer.asUint8List());
       case 'f':
         bd.setFloat32(0, (a as num).toDouble());
         out.addAll(bd.buffer.asUint8List());
+      case 's':
+        out.addAll(_str(a as String));
       case 'b':
         final b = a as List<int>;
         bd.setInt32(0, b.length);
@@ -36,7 +44,7 @@ Uint8List oscMessage(String address, String types, List<Object> args) {
           ..addAll(bd.buffer.asUint8List())
           ..addAll(_pad(b));
       default:
-        throw ArgumentError('OSC type ${types[k]}');
+        throw ArgumentError('OSC type $t');
     }
   }
   return Uint8List.fromList(out);
