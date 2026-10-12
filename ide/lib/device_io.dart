@@ -127,9 +127,30 @@ class DeviceLink extends ChangeNotifier {
   /// Returns a log line.
   Future<String> upload(CompiledStage stage,
       {List<double>? knobs, void Function(String)? progress}) async {
+    final r = await uploadBlob(stage.bytes, stage.slot, progress: progress);
+    if (r != null) return r;
+    for (var k = 0; k < (knobs?.length ?? 0); k++) {
+      sendKnob(k, knobs![k]);
+    }
+    var mapNote = '';
+    if (stage.slot == 1 && stage.outMap.isNotEmpty) {
+      mapNote = ', scan map: ${await sendScanMap(stage.outMap)}';
+    }
+    return 'armed ${stage.bytes.length} bytes in slot ${stage.slot}$mapNote';
+  }
+
+  /// Uploads a raw blob (a compiled stage or a prebuilt C runner) to [slot]. Null when the
+  /// device armed all of it, else what went wrong.
+  Future<String?> uploadBlob(List<int> bytes, int slot,
+      {void Function(String)? progress}) async {
     if (_sock == null) return 'not connected';
-    final path = osc.slotPath[stage.slot]!;
-    final parts = osc.stageParts(stage.bytes, stage.slot);
+    final path = osc.slotPath[slot]!;
+    final List<Uint8List> parts;
+    try {
+      parts = osc.stageParts(bytes, slot);
+    } on ArgumentError catch (e) {
+      return '${e.message}';
+    }
     int? armed;
     for (var i = 0; i < parts.length; i++) {
       progress?.call('part ${i + 1}/${parts.length}');
@@ -143,22 +164,31 @@ class DeviceLink extends ChangeNotifier {
       if (v == null || v < 0) return 'device refused part ${i + 1}: ${r.args}';
       if (last) armed = v;
     }
-    for (var k = 0; k < (knobs?.length ?? 0); k++) {
-      sendKnob(k, knobs![k]);
-    }
-    var mapNote = '';
-    if (stage.slot == 1 && stage.outMap.isNotEmpty) {
-      final r = await request(osc.scanMapMessage(stage.outMap),
-          '/send/1/shader/scanmap', const Duration(seconds: 3));
-      mapNote = r == null
-          ? ', scan map: no reply'
-          : ', scan map: ${r.args.isEmpty ? '?' : r.args.first} entries';
-    }
-    final want = stage.bytes.length ~/ 4;
+    final want = bytes.length ~/ 4;
     return armed == want
-        ? 'armed ${stage.bytes.length} bytes in slot ${stage.slot}$mapNote'
-        : 'device armed $armed words, expected $want (checksum or load failed)$mapNote';
+        ? null
+        : 'device armed $armed words, expected $want (checksum or load failed)';
   }
+
+  /// Sends the scan stage's `@out` map; returns the entry count the device reports.
+  Future<String> sendScanMap(List<OutMapEntry> map) async {
+    final r = await request(osc.scanMapMessage(map), '/send/1/shader/scanmap',
+        const Duration(seconds: 3));
+    return r == null
+        ? 'no reply'
+        : '${r.args.isEmpty ? '?' : r.args.first} entries';
+  }
+
+  /// Sends one OSC message without waiting for a reply.
+  void sendOsc(String address, String types, List<Object> args) =>
+      _send(osc.oscMessage(address, types, args));
+
+  /// Sends one OSC message and waits for the device's reply on [reply] (null on timeout).
+  Future<OscReply?> requestOsc(String address, String types, List<Object> args,
+          String reply, Duration timeout) =>
+      _sock == null
+          ? Future.value(null)
+          : request(osc.oscMessage(address, types, args), reply, timeout);
 
   /// Browses mDNS for `_scion._udp` for [time].
   static Future<List<FoundDevice>> discover(

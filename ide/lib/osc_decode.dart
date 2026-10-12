@@ -62,6 +62,10 @@ void _decode(ByteData b, List<OscReply> out) {
           p += 4;
           args.add(Uint8List.sublistView(b, p, p + n));
           p = (p + n + 3) & ~3;
+        case 'T':
+          args.add(true);
+        case 'F':
+          args.add(false);
         default:
           break;
       }

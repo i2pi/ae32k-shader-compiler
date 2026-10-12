@@ -41,14 +41,81 @@ reply is the number of words the device armed, which the log reports. Then come 
 for a scan stage, the `@out` map. Browsers have no UDP, so the web build edits and measures but
 does not upload.
 
+## Simulator
+
+**Simulate** (Cmd/Ctrl+R) opens a frame simulator that plays stages on a simulated source:
+
+- **Format**: resolution (1080p, 720p, a 960 x 540 preview, SD) and frame rate; `in.t` and
+  `in.frame` follow the simulated clock (0.25x / 0.5x / 1x, pause, single frames).
+- **Stages**: a warp, vertex and scan stage, each from a `.ss` file or the editor's buffer.
+  With a vertex stage the scan stage runs in cell mode (once per vertex); without one, in the
+  pattern mode of `imcu scan start` (every n-th line, points per line, walk lines, phase).
+- **Source**: a test card (hue across, luma down, a 64 px grid, low noise, moving objects),
+  colour bars and ramps, a panning card, or an image file.
+- The stages run in the reference evaluator, which is bit-exact with the native code. The
+  resident's handling follows `hyb_main.c`:
+  - the warp grid: 16 px, +-4 blocks, sampling the source at (x + dx, y + dy), linear between
+    points, blocks with jumping corners blanked;
+  - the cells: left edge, width and height, slopes, clamps, the walk end at row 956 and parked
+    points;
+  - only the first 4 map entries are written in cell mode, at most 24 edges per span;
+  - the `@out` field arithmetic (raw / gain / add / unit);
+  - per-pixel registers change where they are written, line registers from the next line, and
+    line-latched entries take the line's leftmost value and return to base after empty lines.
+- What the registers do to the picture is modelled for the common ones: input swaps, Cb/Cr
+  swaps, input and output CSC gains and offsets, dark screen and forced green. The models are
+  approximate colour matrices; the output CSC rows Y/G/B are taken as R/G/B. Other registers
+  show as a tinted trace of their value. Field bases are nominal: the device uses the value
+  found when the map is set.
+- Overlays: the warp grid, cells and vertices, scan points, the effects and trace on or off,
+  and the source alone. The side panel shows warp points, scan evaluations and register
+  writes for the frame, and a cycle budget from the emulator estimates (warp per frame, cell
+  build against the ~125 lines after the walk, scan per line).
+
+## Examples
+
+**Examples** (Cmd/Ctrl+E) browses zephyr_scion's `tools/imcu/examples`. The folder is found
+above the IDE, or chosen with **Folder...**. The entries come from `examples.json` there, one
+per runnable example:
+
+```json
+{"id": "pip/sphere", "title": "Lit sphere", "desc": "...",
+ "stages": {"warp": null, "scan": "pip/p01_sphere.ss", "vert": "pip/p02_sphere_bands.ss"},
+ "blobs": [{"slot": 2, "file": "ddr/bin/pix_osd.bin"}],
+ "fast": true, "knobs": {"k0": 0.25},
+ "setup": [{"osc": "/send/1/pip/2/enable", "types": "i", "args": [1]}],
+ "start": [{"osc": "...", "types": "i", "args": [1], "reply": "..."}],
+ "stop":  [{"osc": "...", "reply": "..."}]}
+```
+
+- A step is `{"osc", "types", "args"}` (types i, f, s, b), optionally with `"reply": path` and
+  `"timeout"` in seconds (default 10): the run waits for the device's answer and logs it. A negative number,
+  or a string starting with "error", "refused" or "busy", counts as a failure. A step can also
+  be `{"wait": ms}`. There are no shell-command steps: the device takes no commands over OSC.
+  `"kind": "probe"` marks an entry that is not meant to run alone.
+- Without `examples.json`, every `.ss` file is listed. Its slot is guessed from the source,
+  and Run only uploads it.
+- Every stage is compiled in the background; the list marks the ones that fail.
+- **Open** loads a stage into the editor, with the example's FAST setting and knobs.
+- **Run** works as follows:
+  1. It compiles every stage first. If one fails, nothing is sent.
+  2. It runs the previous example's stop steps, then this example's own stop steps.
+  3. It uploads the blobs, then the warp, vertex and scan stages, then the scan map and the
+     knobs.
+  4. It sends the setup and start steps, and stops at the first one that fails.
+  5. Each step's reply goes to the log.
+  6. If the editor holds one of the example's stage files, the run uses the edited buffer.
+- The toolbar chip runs, stops and simulates the current example. C stages are not simulated.
+
 ## Run
 
 ```
 flutter run -d macos          # or windows / linux / chrome
 flutter build macos           # build/macos/Build/Products/Release/shader_ide.app
-flutter test                  # editor and upload tests (a fake device on localhost)
+flutter test                  # editor, upload, simulator and examples tests (a fake device on localhost)
 flutter test test/live_device_test.dart --dart-define=SCION=<device ip>   # a real device: uploads to slot 0
 ```
 
-Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Shift+S save as, Cmd/Ctrl+O open, Cmd/Ctrl+U upload.
+Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Shift+S save as, Cmd/Ctrl+O open, Cmd/Ctrl+U upload,
+Cmd/Ctrl+R simulate, Cmd/Ctrl+E examples.
 Tab inserts two spaces; Enter keeps the indentation.

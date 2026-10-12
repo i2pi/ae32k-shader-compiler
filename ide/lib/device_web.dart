@@ -2,6 +2,8 @@
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
 import 'package:flutter/foundation.dart';
 
+import 'osc_decode.dart';
+
 const bool deviceSupported = false;
 
 class FoundDevice {
@@ -22,6 +24,14 @@ class DeviceLink extends ChangeNotifier {
   Future<String> upload(CompiledStage stage,
           {List<double>? knobs, void Function(String)? progress}) async =>
       status;
+  Future<String?> uploadBlob(List<int> bytes, int slot,
+          {void Function(String)? progress}) async =>
+      status;
+  Future<String> sendScanMap(List<OutMapEntry> map) async => status;
+  void sendOsc(String address, String types, List<Object> args) {}
+  Future<OscReply?> requestOsc(String address, String types, List<Object> args,
+          String reply, Duration timeout) async =>
+      null;
   static Future<List<FoundDevice>> discover(
           {Duration time = const Duration(seconds: 3)}) async =>
       const [];

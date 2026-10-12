@@ -10,7 +10,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'asm_pane.dart';
 import 'code_editor.dart';
 import 'device.dart';
+import 'example_files.dart';
+import 'example_runner.dart';
+import 'examples.dart';
+import 'examples_dialog.dart';
 import 'io_pane.dart';
+import 'sim/sim_engine.dart' show ScanPattern;
+import 'sim/sim_page.dart';
 import 'templates.dart';
 import 'theme.dart';
 
@@ -54,6 +60,10 @@ class _IdePageState extends State<IdePage> {
   int _req = 0;
   final _knobs = List<double>.filled(8, 0);
   final _log = <String>[];
+  ExampleSet? _exSet;
+  Example? _example; // the example last opened or run
+  final _runner = ExampleRunner();
+  bool _exBusy = false;
 
   @override
   void initState() {
@@ -250,6 +260,169 @@ class _IdePageState extends State<IdePage> {
 
   String? _status;
 
+  // --------------------------------------------------------------- examples
+
+  Future<ExampleSet?> _loadExamples({String? dir}) async {
+    final d = dir ?? findExamplesDir(_prefs?.getString('examplesDir'));
+    if (d == null) return null;
+    final set = await ExampleSet.load(d);
+    _prefs?.setString('examplesDir', d);
+    if (mounted) setState(() => _exSet = set);
+    return set;
+  }
+
+  Future<void> _examples() async {
+    if (!examplesSupported) {
+      _say('the examples browser needs the desktop app (no file access in a browser)');
+      return;
+    }
+    final set = _exSet ?? await _loadExamples();
+    if (!mounted) return;
+    if (set == null) {
+      _say('no tools/imcu/examples folder found; choose it in the Examples browser');
+    }
+    final pick = await showDialog<ExampleChoice>(
+      context: context,
+      builder: (c) => set == null
+          ? _NoExamples(onChoose: (d) async {
+              Navigator.pop(c);
+              await _loadExamples(dir: d);
+              _examples();
+            })
+          : ExamplesDialog(
+              set: set,
+              selectedId: _example?.id,
+              canRun: deviceSupported,
+              onChooseDir: (d) async {
+                Navigator.pop(c);
+                await _loadExamples(dir: d);
+                _examples();
+              }),
+    );
+    if (pick == null || !mounted) return;
+    final ex = pick.example;
+    switch (pick.action) {
+      case ExampleAction.open:
+        await _openExample(ex, pick.slot ?? ex.primarySlot!);
+      case ExampleAction.run:
+        if (ex.primarySlot case final s? when !_holdsExample(ex)) await _openExample(ex, s);
+        setState(() => _example = ex);
+        await _runExample();
+      case ExampleAction.simulate:
+        if (ex.primarySlot case final s? when !_holdsExample(ex)) await _openExample(ex, s);
+        await _simulateExample(ex);
+    }
+  }
+
+  /// Whether the editor holds one of [ex]'s stage files.
+  bool _holdsExample(Example ex) {
+    final f = _exSet?.files;
+    return f != null && ex.stages.values.any((r) => f.path(r) == _file);
+  }
+
+  Future<void> _openExample(Example ex, int slot) async {
+    final set = _exSet!, rel = ex.stages[slot]!;
+    final String src;
+    try {
+      src = await set.files.text(rel);
+    } catch (e) {
+      _say('$rel: cannot read ($e)');
+      return;
+    }
+    setState(() {
+      _example = ex;
+      _file = set.files.path(rel);
+      _slot = slot;
+      _fast = ex.fast;
+      for (var k = 0; k < 8; k++) {
+        _knobs[k] = ex.knobs[k] ?? 0;
+      }
+    });
+    _code.text = src;
+    _dirty = false;
+    _prefs?.setString('file', _file!);
+    _prefs?.setInt('slot', slot);
+    _prefs?.setBool('fast', _fast);
+    _say('opened ${ex.title}: $rel (${_stageNames[slot].toLowerCase()} stage)');
+  }
+
+  /// The editor's buffer for the example stage it holds, so a run uses the edited text.
+  Map<String, String> _editorSources(Example ex) {
+    final f = _exSet?.files;
+    return {
+      for (final r in ex.stages.values)
+        if (f != null && f.path(r) == _file) r: _code.text,
+    };
+  }
+
+  Future<void> _runExample() async {
+    final ex = _example, set = _exSet;
+    if (ex == null || set == null || _exBusy || _busy) return;
+    if (!_link.open) await _connect();
+    setState(() => _exBusy = true);
+    _say('running ${ex.title}...');
+    final ok = await _runner.run(ex, set.files, LinkTarget(_link, progress: (s) => setState(() => _status = s)), _say,
+        sources: _editorSources(ex), knobs: _knobs);
+    if (!mounted) return;
+    setState(() {
+      _exBusy = false;
+      _status = null;
+    });
+    _say(ok ? '${ex.title}: running' : '${ex.title}: stopped at the step above');
+    _analyzeNow();
+  }
+
+  Future<void> _stopExample() async {
+    if (_runner.running == null || _exBusy) return;
+    setState(() => _exBusy = true);
+    final title = _runner.running!.title;
+    await _runner.stop(LinkTarget(_link), _say);
+    if (!mounted) return;
+    setState(() => _exBusy = false);
+    _say('$title: stopped');
+  }
+
+  Future<void> _simulateExample(Example ex) async {
+    final set = _exSet!, edited = _editorSources(ex);
+    final stages = <int, SimStageRef>{};
+    for (final MapEntry(key: slot, value: rel) in ex.stages.entries) {
+      try {
+        stages[slot] = SimStageRef(rel.split('/').last, edited[rel] ?? await set.files.text(rel));
+      } catch (e) {
+        _say('$rel: cannot read ($e)');
+        return;
+      }
+    }
+    if (ex.blobs.isNotEmpty) _say('${ex.title}: the simulator does not run C stages (${ex.blobs.map((b) => b.$2).join(', ')})');
+    final a = ex.patternArgs;
+    final pattern = a == null ? null : ScanPattern(a[0] ?? 8, a[3] ?? 1, a[1] ?? 1000, a[5] ?? 0);
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SimPage(
+        editorSource: _code.text,
+        editorSlot: _slot,
+        editorName: _file?.split(RegExp(r'[/\\]')).last ?? 'untitled',
+        knobs: [for (var k = 0; k < 8; k++) ex.knobs[k] ?? 0],
+        fast: ex.fast,
+        stages: stages,
+        points: ex.vertexCount,
+        pattern: pattern,
+      ),
+    ));
+  }
+
+  void _simulate() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SimPage(
+        editorSource: _code.text,
+        editorSlot: _slot,
+        editorName: _file?.split(RegExp(r'[/\\]')).last ?? 'untitled',
+        knobs: _knobs,
+        fast: _fast,
+      ),
+    ));
+  }
+
   void _setKnob(int k, double v) {
     setState(() => _knobs[k] = v);
     _knobSend?.cancel();
@@ -285,6 +458,8 @@ class _IdePageState extends State<IdePage> {
         key(LogicalKeyboardKey.keyS, shift: true): () => _save(as: true),
         key(LogicalKeyboardKey.keyO): _open,
         key(LogicalKeyboardKey.keyU): _upload,
+        key(LogicalKeyboardKey.keyR): _simulate,
+        key(LogicalKeyboardKey.keyE): _examples,
       },
       child: Scaffold(
         body: Column(
@@ -361,6 +536,7 @@ class _IdePageState extends State<IdePage> {
           ),
           _Btn(icon: Icons.folder_open_outlined, label: 'Open', onTap: _open),
           _Btn(icon: Icons.save_outlined, label: 'Save', onTap: () => _save()),
+          _Btn(icon: Icons.auto_awesome_motion_outlined, label: 'Examples', onTap: _examples),
           const SizedBox(width: 8),
           Flexible(
             child: Text('$name${_dirty ? ' •' : ''}',
@@ -398,7 +574,10 @@ class _IdePageState extends State<IdePage> {
                 setState(() => _showAsm = !_showAsm);
                 _prefs?.setBool('asm', _showAsm);
               }),
+          const SizedBox(width: 10),
+          _Btn(icon: Icons.play_circle_outline, label: 'Simulate', onTap: _simulate),
           const Spacer(),
+          if (_example != null) _exampleChip(_example!),
           if (deviceSupported) ...[
             Container(
               width: 9,
@@ -445,6 +624,54 @@ class _IdePageState extends State<IdePage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The current example, with Run and Stop.
+  Widget _exampleChip(Example ex) {
+    final running = _runner.running?.id == ex.id;
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.fromLTRB(10, 2, 2, 2),
+      decoration: BoxDecoration(
+          color: Sc.inset, borderRadius: BorderRadius.circular(7)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Tooltip(
+            message: ex.id,
+            child: Text(ex.title,
+                overflow: TextOverflow.ellipsis,
+                style: Sc.uiText(13, color: running ? Sc.green : Sc.label)),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Run the example on the device (stages, blobs, knobs, setup, start)',
+          visualDensity: VisualDensity.compact,
+          onPressed: deviceSupported && ex.runnable && !_exBusy ? _runExample : null,
+          icon: _exBusy
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.play_arrow, size: 18, color: Sc.green),
+        ),
+        IconButton(
+          tooltip: 'Run the example\'s stop steps',
+          visualDensity: VisualDensity.compact,
+          onPressed: running && !_exBusy ? _stopExample : null,
+          icon: Icon(Icons.stop, size: 18, color: running ? Sc.red : Sc.faint),
+        ),
+        IconButton(
+          tooltip: 'Simulate the example',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _simulateExample(ex),
+          icon: const Icon(Icons.play_circle_outline, size: 17, color: Sc.label),
+        ),
+        IconButton(
+          tooltip: 'Close the example',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => setState(() => _example = null),
+          icon: const Icon(Icons.close, size: 15, color: Sc.faint),
+        ),
+      ]),
     );
   }
 
@@ -839,5 +1066,30 @@ class _DragDivider extends StatelessWidget {
             child: Center(child: Container(width: 1, color: Colors.black38)),
           ),
         ),
+      );
+}
+
+class _NoExamples extends StatelessWidget {
+  final ValueChanged<String> onChoose;
+  const _NoExamples({required this.onChoose});
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        backgroundColor: Sc.card,
+        title: Text('Examples', style: Sc.uiText(16, color: Sc.text)),
+        content: Text(
+            'No tools/imcu/examples folder was found above the IDE. Choose the examples folder of a zephyr_scion checkout.',
+            style: Sc.uiText(14)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final d = await getDirectoryPath();
+              if (d != null) onChoose(d);
+            },
+            child: const Text('Choose folder...'),
+          ),
+        ],
       );
 }
