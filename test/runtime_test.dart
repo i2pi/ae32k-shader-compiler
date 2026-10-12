@@ -20,8 +20,8 @@ class Harness {
   static const ctx = Cpu.dspm + 0x1000, sinAt = Cpu.dspm + 0x1400;
   late final Assembled code;
   final String entry;
-  Harness(this.entry) {
-    code = assemble(runtimeFor([entry]), slotAddr[0]!);
+  Harness(this.entry, {bool fast = false}) {
+    code = assemble(runtimeFor([entry], fast: fast), slotAddr[0]!);
   }
 
   int call(List<int> args) {
@@ -71,6 +71,32 @@ void check(String entry, int arity, int Function(List<int>) ref, {int random = 3
 
 void main() {
   check('__qmul', 2, (a) => qMul(a[0], a[1]));
+  for (final fast in [false, true]) {
+    test('__qmul around its saturation tests${fast ? ', fast' : ''}', () {
+      // the C saturates at (|a|>>16)*(|b|>>16) >= 0x7fff, and the routine also at |a||b| >= 2^47
+      final h = Harness('__qmul', fast: fast);
+      final rng = Random(fast ? 12 : 11);
+      const highs = [(1, 0x7ffe), (1, 0x7fff), (0x7fff, 1), (181, 181), (181, 182), (2, 0x3fff), (2, 0x4000), (0x8000, 1),
+        (0x8000, 0), (0, 0x8000), (3, 0x2aaa), (0x7fff, 0), (0xffff >> 1, 1), (255, 128), (256, 127),
+        (7, 0x1249), (31, 0x421), (151, 217), (217, 151)]; // 0x7fff = 7*31*151: the C's test fires below 2^47
+      qFast = fast;
+      try {
+        for (final (ah, bh) in highs) {
+          for (var n = 0; n < 400; n++) {
+            int mk(int hi) {
+              final lo = rng.nextBool() ? rng.nextInt(4) : rng.nextInt(0x10000);
+              final m = hi == 0x8000 ? 0x80000000 : (hi << 16 | lo);
+              return rng.nextBool() ? m.toSigned(32) : (-m).toSigned(32);
+            }
+            final a = mk(ah), b = mk(bh);
+            expect(h.call([a, b]), qMul(a, b), reason: 'qmul($a, $b)');
+          }
+        }
+      } finally {
+        qFast = false;
+      }
+    });
+  }
   check('__qdiv', 2, (a) => qDiv(a[0], a[1]), random: 1500);
   test('__qdiv at the saturation boundary and exact multiples', () {
     // |a| = |b| << 15 is where the quotient reaches 2^31; |a| = k|b| +- 1 flips integer bits.

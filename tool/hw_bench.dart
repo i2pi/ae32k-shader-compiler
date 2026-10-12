@@ -115,22 +115,24 @@ final dspProbes = <String, List<DspCase>>{
   ],
 };
 String dspProbe(int id, List<DspCase> cases) {
-  final s = StringBuffer('    ldi $id,%R9\n    st %R9,(%R8,84)\n');
+  // R0-R7 are callee-saved in the stage ABI
+  final s = StringBuffer('    push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7\n    ldi $id,%R9\n    st %R9,(%R8,84)\n');
   for (var k = 0; k < cases.length; k++) {
     s.write('    ${cases[k].$1}\n    st %R1,(%R8,${88 + 4 * k})\n');
   }
-  s.write('    jplr\n');
+  s.write('    pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7\n    jplr\n');
   return s.toString();
 }
+const _save07 = 'push %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7', _restore07 = 'pop %R0,%R1,%R2,%R3,%R4,%R5,%R6,%R7';
 final dspBenches = <Bench>[
-  Bench('min_rr', (k) => 'min %R2,%R1', setup: 'ldi 5,%R1\n    ldi 3,%R2', emulate: false),
-  Bench('max_rr', (k) => 'max %R2,%R1', setup: 'ldi 5,%R1\n    ldi 3,%R2', emulate: false),
-  Bench('abs', (k) => 'abs %R1', setup: 'ldi -5,%R1', emulate: false),
-  Bench('min_imm', (k) => 'min 3,%R1', setup: 'ldi 5,%R1', emulate: false),
-  Bench('abs_use', (k) => 'abs %R1\n    add %R1,%R2', setup: 'ldi -5,%R1', emulate: false),
-  Bench('mul_mfmh', (k) => 'mul %R2,%R0\n    mfmh %R1', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
-  Bench('mul_only', (k) => 'mul %R2,%R0', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
-  Bench('mfmh_use', (k) => 'mul %R2,%R0\n    mfmh %R1\n    add %R1,%R3', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
+  Bench('min_rr', (k) => 'min %R2,%R1', setup: '$_save07\n    ldi 5,%R1\n    ldi 3,%R2', emulate: false, teardown: _restore07),
+  Bench('max_rr', (k) => 'max %R2,%R1', setup: '$_save07\n    ldi 5,%R1\n    ldi 3,%R2', emulate: false, teardown: _restore07),
+  Bench('abs', (k) => 'abs %R1', setup: '$_save07\n    ldi -5,%R1', emulate: false, teardown: _restore07),
+  Bench('min_imm', (k) => 'min 3,%R1', setup: '$_save07\n    ldi 5,%R1', emulate: false, teardown: _restore07),
+  Bench('abs_use', (k) => 'abs %R1\n    add %R1,%R2', setup: '$_save07\n    ldi -5,%R1', emulate: false, teardown: _restore07),
+  Bench('mul_mfmh', (k) => 'mul %R2,%R0\n    mfmh %R1', setup: '$_save07\n    ldi 5,%R0\n    ldi 3,%R2', teardown: _restore07),
+  Bench('mul_only', (k) => 'mul %R2,%R0', setup: '$_save07\n    ldi 5,%R0\n    ldi 3,%R2', teardown: _restore07),
+  Bench('mfmh_use', (k) => 'mul %R2,%R0\n    mfmh %R1\n    add %R1,%R3', setup: '$_save07\n    ldi 5,%R0\n    ldi 3,%R2', teardown: _restore07),
 ];
 
 const localBench = Bench('local_st', _localBody, setup: 'ldi 0x70000444,%R8\n    ldi 0,%R9', n1: 16, n2: 128, emulate: false);
@@ -261,6 +263,12 @@ Future<void> main(List<String> args) async {
         final blob = pad4(assemble(dspProbe(myId, e.value), base).bytes);
         final want = [for (final c in e.value) c.$2];
         id++;
+        // the emulator has no MIN/MAX/ABS; everything else must pass it first (ABI, results)
+        if (!e.value.any((c) => RegExp(r'\b(min|max|abs) ').hasMatch(c.$1))) {
+          final o = StageRunner(blob, slot: slot).run(hookInputs);
+          final eo = [for (var k = 0; k < want.length; k++) _s32(o[1 + k])];
+          if (o[0] != myId || eo.join(',') != want.join(',')) throw StateError('${e.key}: emulator gives $eo, expected $want');
+        }
         if (dev == null) {
           print('${e.key.padRight(11)} ${blob.length} B (dry)');
           continue;

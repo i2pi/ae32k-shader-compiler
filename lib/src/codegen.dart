@@ -575,6 +575,19 @@ class CodeGen {
       if (d != r) _e('lea (%R$d,0),%R$r');
       return;
     }
+    if (noSat) {
+      final k = c.toSigned(32);
+      final String src;
+      if (k >= 0 && k <= 0xffff) { // the immediate forms the stages already run
+        src = '$k';
+      } else {
+        _e('ldi $k,%R9');
+        src = '%R9';
+      }
+      _mulWide(r, src, nonNeg && k > 0);
+      _e('lea (%R10,0),%R$r');
+      return;
+    }
     final lAbs = _newLabel(), lSat = _newLabel(), lSign = _newLabel(), lDone = _newLabel();
     if (!nonNeg) {
       _e('lea (%R$r,0),%R9'); // x, for the sign
@@ -639,6 +652,30 @@ class CodeGen {
     _e('lea (%R10,0),%R$r');
   }
 
+  /// R10 = q_mul(R[x], src) where it cannot saturate: the signed 64-bit product (MUL, then
+  /// MFMH/MFML, device-verified 2026-10-12) shifted down 16 truncating toward zero, as the
+  /// C's sign-magnitude q_mul does, mod 2^32 (so also the fast form). [src] is a register or a
+  /// constant operand; [nonNeg] when the product cannot be negative. Uses R10-R12.
+  void _mulWide(int x, String src, bool nonNeg) {
+    if (x != 10) _e('lea (%R$x,0),%R10');
+    _e('mul $src,%R10');
+    _e('mfmh %R10');
+    _e('mfml %R12');
+    _e('lea (%R12,0),%R11');
+    _e('lsr 16,%R11'); // floor
+    if (!nonNeg) {
+      final l = _newLabel();
+      _e('cmpq 0,%R10');
+      _e('jge $l');
+      _e('and 65535,%R12');
+      _e('jz $l');
+      _e('addq 1,%R11'); // a negative product with a fraction below 2^-16 rounds up to trunc
+      _out.writeln('$l:');
+    }
+    _e('asl 16,%R10');
+    _e('add %R11,%R10');
+  }
+
   /// q_mul(x, f) inline for |f| <= 1.0 (f in [fr], x in [xr] or anything): bh is 0, or 1 with
   /// bl == 0, so the product is ah*|f| + (al*|f| >> 16); it saturates only for |f| == 1.0
   /// and |x| >= 0x7fff0000. Uses R9-R12.
@@ -646,6 +683,12 @@ class CodeGen {
     final ab = _exprs([x, f]);
     final v = _own(ab[0]), w = _own(ab[1]);
     final xNon = xr != null && xr.nonNeg, fNon = fr.nonNeg;
+    if (fast || fr.mag < q1 || (xr != null && xr.mag < 0x7fff0000)) {
+      _mulWide(v.r, '%R${w.r}', (xNon && fNon) || (xr != null && xr.nonPos && fr.nonPos));
+      _e('lea (%R10,0),%R${v.r}');
+      _release(w);
+      return v;
+    }
     if (!(xNon && fNon)) {
       _e('lea (%R${v.r},0),%R9');
       _e('xor %R${w.r},%R9'); // the sign of the result in bit 31

@@ -9,6 +9,7 @@ class Range {
   final int lo, hi;
   const Range(this.lo, this.hi);
   bool get nonNeg => lo >= 0;
+  bool get nonPos => hi <= 0;
   int get mag => hi.abs() > lo.abs() ? hi.abs() : lo.abs();
   bool within(int a, int b) => lo >= a && hi <= b;
   Range union(Range o) => Range(lo < o.lo ? lo : o.lo, hi > o.hi ? hi : o.hi);

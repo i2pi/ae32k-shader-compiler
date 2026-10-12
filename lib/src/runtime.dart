@@ -17,7 +17,10 @@ class Routine {
 }
 
 final routines = <String, Routine>{
-  // q_mul: sign-magnitude 16x16 split, saturating at +-0x7fffffff, as the C does.
+  // q_mul: sign-magnitude, saturating at +-0x7fffffff, as the C does: |a|*|b| as one unsigned
+  // 64-bit product (MULU, then MFMH/MFML: device-verified 2026-10-12, 1 cycle each). The C
+  // saturates when (|a|>>16)*(|b|>>16) >= 0x7fff, which can fire just below the true
+  // overflow, so that test is kept as is; otherwise the result overflows iff MH >= 0x8000.
   '__qmul': Routine('''
 __qmul:
     lea (%R8,0),%R11
@@ -30,38 +33,30 @@ __qmul_a:
     jge __qmul_b
     neg %R9
 __qmul_b:
-    lea (%R8,0),%R12
-    lsr 16,%R12             // ah
-    lea (%R12,0),%R13       // ah, kept
-    lea (%R9,0),%R10
-    lsr 16,%R10             // bh
-    mul %R10,%R12           // hi = ah*bh
+    lea (%R8,0),%R12        // !fast
+    lsr 16,%R12             // !fast: ah
+    lea (%R9,0),%R10        // !fast
+    lsr 16,%R10             // !fast: bh
+    mul %R10,%R12           // !fast: ah*bh
     cmp 32767,%R12          // !fast
-    jnc __qmul_sat          // !fast: hi >= 0x7fff
-    asl 16,%R12             // hi << 16
-    and 65535,%R8           // al
-    and 65535,%R9           // bl
-    mul %R8,%R10            // al*bh
-    add %R10,%R12
-    lea (%R13,0),%R10
-    mul %R9,%R10            // ah*bl
-    add %R10,%R12
-    mul %R9,%R8             // al*bl
+    jnc __qmul_sat          // !fast: ah*bh >= 0x7fff
+    mulu %R9,%R8            // MH:ML = |a|*|b|
+    mfmh %R12
+    cmp 32768,%R12          // !fast
+    jnc __qmul_sat          // !fast: |a|*|b| >= 2^47
+    mfml %R8
     lsr 16,%R8
-    add %R8,%R12            // r (mod 2^32, as the C)
-    lea (%R12,0),%R8
-    cmpq 0,%R8              // !fast
-    jge __qmul_sign         // !fast: r >= 0x7fffffff clamps; only r >= 2^31 changes anything
-    ldi 2147483647,%R8      // !fast
+    asl 16,%R12
+    or %R12,%R8             // r = |a|*|b| >> 16 (mod 2^32, as the C)
 __qmul_sign:
     cmpq 0,%R11
     jge __qmul_ret
     neg %R8
 __qmul_ret:
     jplr
-__qmul_sat:
-    ldi 2147483647,%R8
-    jmp __qmul_sign
+__qmul_sat:                 // !fast
+    ldi 2147483647,%R8      // !fast
+    jmp __qmul_sign         // !fast
 '''),
 
   // q_div: (|a| << 16) / |b| over a 48-bit numerator, saturating at 0x7fffffff, sign applied
