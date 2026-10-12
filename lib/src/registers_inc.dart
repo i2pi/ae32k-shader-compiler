@@ -22,8 +22,8 @@ in_mode_sel        0x010E 0x000F  0 raw    pixel   input mode select (dual edge/
 in_port_sel_ch0    0x010F 0x000F  0 raw    pixel   input mux port for channel 0 (switches source mid-line)
 wmc_force_wr_c     0x0233 0x0060  5 raw    pixel   write controller: force chroma write pattern
 wmc_force_wr_y     0x0233 0x0180  7 raw    pixel   write controller: force luma write pattern
-osd_box_x0         0x1059 0x1FFF  0 raw    pixel   OSD simple box start x (needs osd_box_en = 7)
-osd_box_x1         0x105A 0x1FFF  0 raw    partial OSD simple box end x (effect appears from the next pixel on the other side)
+osd_box_x0         0x1059 0x1FFF  0 raw    frame   OSD simple box start x (needs osd_box_en = 7). NOT usable from the scan engine: continuous writes hide the box (2026-10-12)
+osd_box_x1         0x105A 0x1FFF  0 raw    frame   OSD simple box end x. NOT usable from the scan engine: continuous writes hide the box (2026-10-12)
 
 # The rows above name single fields from the manual. The sweep established the REGISTER responds per pixel by
 # flipping whole bytes; which bit inside it does the work was not isolated. These rows write exactly the byte the
