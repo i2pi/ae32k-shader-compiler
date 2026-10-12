@@ -1,13 +1,15 @@
 // Times code on the device with the resident's run-once hook (`imcu hybrun a <slot> <reps>`,
 // timer 0 = cpu/4 ticks) and compares it with the emulator.
 //
-//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages [--stage name,...] [--corpus]] [--round2]
+//   dart run tool/hw_bench.dart [--host IP] [--dry] [--local] [--only name,...] [--stages [--stage name,...] [--corpus]] [--round2] [--dsp]
 //
 // Microbenchmarks: each body is assembled at two repeat counts. The cost of one body is
 // d(ticks)*4 / (reps * dN), so the hook's call overhead and the blob's setup cancel. Every
 // blob first stores its id in out[0], so the reply proves that the intended blob ran.
 // --stages also runs compiled examples (native, and the gcc corpus blobs for slot 0) and
 // checks out[0..7] against the reference for the hook's fixed inputs.
+// --dsp probes the unverified DSP-extension instructions (MIN, MAX, ABS, MFMH/MFML after MUL):
+// one instruction kind per blob, results in out[1..7] against the signed hypothesis, then timing.
 // --local adds the LOCAL register store (0x0111 <- 0); only with the scan engine stopped.
 //
 // Only slot 0 is used. Each run is kept under ~40000 ticks: the hook reads the 16-bit timer
@@ -80,6 +82,55 @@ final benches = <Bench>[
   Bench('jal_jplr', (k) => 'jal sub', setup: 'push %lr', teardown: 'pop %lr\n    jmp done\nsub:\n    jplr\ndone:', n1: 16, n2: 112), // jal stays one word (+-256 words)
   // c_delay(n) from hyb.elf, called with n = N (the "body" count is the loop count).
   Bench('c_delay_iter', (k) => '', n1: 20, n2: 200),
+];
+
+// --dsp: each probe is up to 7 snippets leaving a result in %R1, stored to out[1..7]. Expected
+// values assume signed operands and Rd = op(Rd, src).
+int _s32(int v) => v.toSigned(32);
+typedef DspCase = (String, int);
+DspCase _rr(String op, int a, int b) =>
+    ('ldi $a,%R1\n    ldi $b,%R2\n    $op %R2,%R1', _s32(op == 'min' ? (a < b ? a : b) : (a > b ? a : b)));
+DspCase _ri(String op, int a, int imm) =>
+    ('ldi $a,%R1\n    $op $imm,%R1', _s32(op == 'min' ? (a < imm ? a : imm) : (a > imm ? a : imm)));
+DspCase _abs(int a, [String r = '%R1']) => ('ldi $a,$r\n    abs $r${r == '%R1' ? '' : '\n    lea ($r,0),%R1'}', _s32(a.abs()));
+const _pairs = [(5, 3), (-1, 1), (0x7fffffff, -0x80000000), (-5, -3), (0x10000, 0x10000), (0, -0x10000), (100, 0)];
+const _a = 0x12345678, _b = -0x65432110;
+final dspProbes = <String, List<DspCase>>{
+  'control': [('ldi 42,%R1', 42), ('ldi -7,%R1\n    neg %R1', 7)],
+  'min_rr': [for (final (a, b) in _pairs) _rr('min', a, b)],
+  'max_rr': [for (final (a, b) in _pairs) _rr('max', a, b)],
+  'abs': [for (final a in [5, -5, 0, -1, -0x80000000, 0x7fffffff, -0x10000]) _abs(a)],
+  'minmax_imm': [_ri('min', 5, 3), _ri('min', -7, 3), _ri('min', 0x20000, 65536), _ri('min', 0, -1),
+    _ri('max', 5, 65536), _ri('max', -5, 0), _ri('max', -3, -1)],
+  'high_regs': [('ldi 5,%R1\n    ldi 3,%R9\n    min %R9,%R1', 3), ('ldi -5,%R7\n    ldi 2,%R9\n    max %R9,%R7\n    lea (%R7,0),%R1', 2),
+    _abs(-9, '%R9'), _abs(-9, '%R7'), ('ldi 7,%R0\n    ldi -2,%R1\n    min %R1,%R0\n    lea (%R0,0),%R1', -2)],
+  'mul_mh': [
+    ('ldi $_a,%R0\n    ldi $_b,%R2\n    mul %R2,%R0\n    mfmh %R1', _s32((_a * _b) >> 32)),
+    ('ldi $_a,%R0\n    ldi $_b,%R2\n    mul %R2,%R0\n    mfml %R1', _s32(_a * _b)),
+    ('ldi $_a,%R0\n    ldi $_b,%R2\n    mul %R2,%R0\n    lea (%R0,0),%R1', _s32(_a * _b)),
+    ('ldi $_a,%R0\n    ldi $_b,%R2\n    mulu %R2,%R0\n    mfmh %R1', _s32((_a * (_b & 0xffffffff)) >> 32)),
+    ('ldi -65536,%R0\n    ldi -65536,%R2\n    mul %R2,%R0\n    mfmh %R1', 1),
+    ('ldi 0x30000,%R0\n    ldi -0x24000,%R2\n    mul %R2,%R0\n    mfmh %R1', _s32((0x30000 * -0x24000) >> 32)),
+    ('ldi 0x30000,%R0\n    ldi -0x24000,%R2\n    mul %R2,%R0\n    mfml %R1', _s32(0x30000 * -0x24000)),
+  ],
+};
+String dspProbe(int id, List<DspCase> cases) {
+  final s = StringBuffer('    ldi $id,%R9\n    st %R9,(%R8,84)\n');
+  for (var k = 0; k < cases.length; k++) {
+    s.write('    ${cases[k].$1}\n    st %R1,(%R8,${88 + 4 * k})\n');
+  }
+  s.write('    jplr\n');
+  return s.toString();
+}
+final dspBenches = <Bench>[
+  Bench('min_rr', (k) => 'min %R2,%R1', setup: 'ldi 5,%R1\n    ldi 3,%R2', emulate: false),
+  Bench('max_rr', (k) => 'max %R2,%R1', setup: 'ldi 5,%R1\n    ldi 3,%R2', emulate: false),
+  Bench('abs', (k) => 'abs %R1', setup: 'ldi -5,%R1', emulate: false),
+  Bench('min_imm', (k) => 'min 3,%R1', setup: 'ldi 5,%R1', emulate: false),
+  Bench('abs_use', (k) => 'abs %R1\n    add %R1,%R2', setup: 'ldi -5,%R1', emulate: false),
+  Bench('mul_mfmh', (k) => 'mul %R2,%R0\n    mfmh %R1', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
+  Bench('mul_only', (k) => 'mul %R2,%R0', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
+  Bench('mfmh_use', (k) => 'mul %R2,%R0\n    mfmh %R1\n    add %R1,%R3', setup: 'ldi 5,%R0\n    ldi 3,%R2', emulate: false),
 ];
 
 const localBench = Bench('local_st', _localBody, setup: 'ldi 0x70000444,%R8\n    ldi 0,%R9', n1: 16, n2: 128, emulate: false);
@@ -185,7 +236,7 @@ Future<void> main(List<String> args) async {
   String? opt(String n) => args.contains(n) ? args[args.indexOf(n) + 1] : null;
   final dry = args.contains('--dry');
   final only = opt('--only')?.split(','), stageOnly = opt('--stage')?.split(',');
-  final list = [...args.contains('--round2') ? benches2 : benches, if (args.contains('--local')) localBench].where((b) => only == null || only.contains(b.name)).toList();
+  final list = [...args.contains('--dsp') ? dspBenches : args.contains('--round2') ? benches2 : benches, if (args.contains('--local')) localBench].where((b) => only == null || only.contains(b.name)).toList();
   final dev = dry ? null : Device(opt('--host') ?? Platform.environment['SCION_IP'] ?? '192.168.100.221');
   await dev?.open();
   try {
@@ -200,6 +251,28 @@ Future<void> main(List<String> args) async {
       if (r[1] != reps) throw StateError('$what: hook echoed reps ${r[1]}, sent $reps (radix?)');
       if (r[2] != myId) throw StateError('$what: out[0] = ${r[2].toRadixString(16)}, expected ${myId.toRadixString(16)} (blob not armed?)');
       return (r[0] * tickCycles / reps, r[0]);
+    }
+
+    if (args.contains('--dsp')) {
+      // functional first: a probe that faults stops the run before any timing
+      final pick = opt('--probe')?.split(',');
+      for (final e in dspProbes.entries.where((e) => pick == null || pick.contains(e.key))) {
+        final myId = id;
+        final blob = pad4(assemble(dspProbe(myId, e.value), base).bytes);
+        final want = [for (final c in e.value) c.$2];
+        id++;
+        if (dev == null) {
+          print('${e.key.padRight(11)} ${blob.length} B (dry)');
+          continue;
+        }
+        await dev.upload(blob);
+        final r = await dev.run(1); // out[] after one rep
+        if (r.length < 10) { print("${e.key}: short reply $r"); continue; }
+        if (r[2] != myId) throw StateError('${e.key}: out[0] = ${r[2].toRadixString(16)}, expected ${myId.toRadixString(16)}');
+        final out = [for (var k = 0; k < want.length; k++) _s32(r[3 + k])];
+        print('${e.key.padRight(11)} ${[for (var k = 0; k < want.length; k++) out[k] == want[k] ? 'ok' : '${out[k].toRadixString(16)}!=${want[k].toRadixString(16)}'].join(' ')}'
+            );
+      }
     }
 
     print('${'bench'.padRight(14)} ${'emu/body'.padLeft(9)} ${'hw/body'.padLeft(9)}   (hw ticks n1, n2; reps)');
