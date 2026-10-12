@@ -32,4 +32,5 @@ const outputSlot = {
   'o0': 0, 'o1': 1, 'o2': 2, 'o3': 3, 'o4': 4, 'o5': 5, 'o6': 6, 'o7': 7,
   'o8': 8, 'o9': 9, 'o10': 10, 'o11': 11, 'o12': 12, 'o13': 13, 'o14': 14, 'o15': 15,
   'vx': 0, 'vy': 1, 'p0': 2, 'p1': 3, 'p2': 4, 'p3': 5,
+  'vdx': 6, 'vdw': 7, // cell mode: left-edge and width slopes, px per line
 };

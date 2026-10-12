@@ -80,7 +80,7 @@ StageAnalysis analyzeStage(String source,
   }
   final init = List.filled(16, 0);
   for (final e in prog.outMap) {
-    if (e.mode == 1) init[e.slot] = 65536;
+    if ((e.mode & 15) == 1) init[e.slot] = 65536;
   }
   final runner = StageRunner(st.bytes, slot: slot);
   final rng = Random(1);

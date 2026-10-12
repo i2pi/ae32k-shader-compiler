@@ -121,6 +121,7 @@ final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_]\w*)(?:\s+(\w+))?\s*;?
     int n(String s) => s.startsWith('0x') || s.startsWith('0X') ? int.parse(s.substring(2), radix: 16) : int.parse(s);
     final String name, mode;
     final int reg, mask, shift;
+    var hold = 0; // mode bit 4: a line-latched register, reset by the resident in the blanking
     if (m != null) {
       (name, mode) = (m.group(1)!, m.group(5)!);
       (reg, mask, shift) = (n(m.group(2)!), n(m.group(3)!), n(m.group(4)!));
@@ -132,10 +133,11 @@ final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_]\w*)(?:\s+(\w+))?\s*;?
           (throw ShaderSyntaxError('@out $name: unknown register name ${mn.group(2)} (see tools/imcu/registers.inc)', i + 1));
       mode = mn.group(3) ?? r.mode;
       (reg, mask, shift) = (r.reg, r.mask, r.shift);
+      if (r.granularity == 'line' || r.granularity == 'frame') hold = 0x10;
     }
     final modeN = outModes[mode] ?? (throw ShaderSyntaxError('@out $name: mode $mode? (raw gain add unit strobe)', i + 1));
     names.putIfAbsent(name, () => names.length);
-    entries.add(OutMapEntry(reg, mask, shift, modeN, names[name]!));
+    entries.add(OutMapEntry(reg, mask, shift, modeN | hold, names[name]!));
   }
   if (names.length > 16) throw ShaderSyntaxError('more than 16 named outputs');
   return (kept.join('\n'), entries, names);
