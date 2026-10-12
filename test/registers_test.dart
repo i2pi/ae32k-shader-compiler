@@ -24,8 +24,10 @@ void main() {
     expect(p.outMap[0].reg, r.reg);
     expect(p.outMap[0].mask, r.mask);
     expect(p.outMap[0].shift, r.shift);
-    expect(p.outMap[0].mode, outModes[r.mode]);
-    expect(p.outMap[1].mode, outModes['gain']);
+    expect(p.outMap[0].mode, outModes[r.mode]); // a pixel register: no hold flag
+    // a line / frame register carries the hold flag (mode bit 4: line-latched, as shader.py sets it)
+    expect(registers['out0_csc_y0']!.granularity, anyOf('line', 'frame'));
+    expect(p.outMap[1].mode, outModes['gain']! | 0x10);
     expect(p.outMap[2].slot, p.outMap[1].slot); // a name used twice shares one output
     expect(() => parse('@out a no_such_register'), throwsA(isA<ShaderSyntaxError>()));
     expect(() => parse('@out a in_swap sideways'), throwsA(isA<ShaderSyntaxError>()));
