@@ -134,6 +134,35 @@ void main() {
     });
   }
 
+  for (final fast in [false, true]) {
+    test('constant locals, shared subexpressions, smoothstep and fractional divisors${fast ? ', fast' : ''}', () {
+      // programs shaped for the AST passes: a let bound to a constant, the same expression
+      // twice, cos next to sin(.. + 0.25), smoothstep with constant edges (either order, equal,
+      // wide), and divisions of bounded values by fractions
+      final rng = Random(fast ? 77 : 78);
+      const edges = ['0.0, 0.06', '0.1, 0.5', '0.5, 0.1', '0.3, 0.3', '-2, 3', '0, 1', '0.02, 0.12', '-1000, 1000', '0, 0.5', '0, 0.75'];
+      const fracs = ['0.06', '0.37', '0.0002', '0.75', '1.5', '-0.4', '2.5', '0.123', '12.25', '0.5'];
+      const bounded = ['frac(in.x)', 'sin(in.t)', 'clamp(in.y, -2, 3)', 'mod(in.x, 3)', 'abs(sin(in.u)) * 40', 'min(max(in.k0, 0), 1)', 'mod(in.y, 1080)'];
+      for (var n = 0; n < 150; n++) {
+        final g = RandomProgram(rng);
+        final e = g.expr(2, ['a']), f = g.expr(2, ['a']);
+        final c = ['24', '0.3', '1080', '-7', '0.0625', '3'][rng.nextInt(6)];
+        final src = [
+          'let a = in.x * 0.5 + in.k1;',
+          'let n = $c;',
+          'let b = ($e) / n + mod(in.x, n);',
+          'let s = smoothstep(${edges[rng.nextInt(edges.length)]}, $f);',
+          'out.o0 = b * ($e) + cos(a) * sin(a + 0.25) - cos(a + 0.5);',
+          'out.o1 = s * (1 - s) + ($f);',
+          'out.o2 = ${bounded[rng.nextInt(bounded.length)]} / ${fracs[rng.nextInt(fracs.length)]};',
+          'if (in.k2 > 0.5) {',
+          '  out.o3 = ($e) * n - smoothstep(${edges[rng.nextInt(edges.length)]}, in.y);',
+          '}',
+        ].join('\n');
+        checkProgram('passes $n', src, 0, rng, runs: 60, fast: fast);
+      }
+    });
+  }
   test('400 random programs, fast', () {
     final rng = Random(20261012);
     final gen = RandomProgram(rng);

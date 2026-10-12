@@ -36,7 +36,8 @@ Range? mulRange(Range? a, Range? b) {
     if (p < lo) lo = p;
     if (p > hi) hi = p;
   }
-  return Range(lo ~/ q1 - 1, hi ~/ q1 + 1);
+  // q_mul without saturation is exactly trunc(a * b / 2^16) (sign-magnitude), monotone in the product
+  return Range(lo ~/ q1, hi ~/ q1);
 }
 
 Range? rangeOf(Expr e, Map<String, Range?> locals) {
@@ -61,8 +62,14 @@ Range? rangeOf(Expr e, Map<String, Range?> locals) {
           return op == '+' ? _fit(a.lo + b.lo, a.hi + b.hi) : _fit(a.lo - b.hi, a.hi - b.lo);
         case '*':
           return mulRange(rangeOf(l, locals), rangeOf(r, locals));
-        case '/' || '%':
-          return null;
+        case '/':
+          // q_div by a constant is monotone in x (sign-magnitude, truncated, saturating)
+          final a = rangeOf(l, locals);
+          if (a == null || r is! Num || r.q == 0) return null;
+          final x = qDiv(a.lo, r.q), y = qDiv(a.hi, r.q);
+          return x <= y ? Range(x, y) : Range(y, x);
+        case '%':
+          return _modRange(r);
         default:
           return flag; // comparisons, && and ||
       }
@@ -74,7 +81,9 @@ Range? rangeOf(Expr e, Map<String, Range?> locals) {
         case 'atan2':
           return const Range(-32768, 32768);
         case 'sqrt':
-          return const Range(0, 11863040);
+          // monotone: each branch of q_sqrt is, and it rises across the 2^22 boundary
+          final x = xs[0];
+          return x == null ? const Range(0, 11863040) : Range(qSqrt(x.lo), qSqrt(x.hi));
         case 'noise' || 'frac':
           return const Range(0, 0xffff);
         case 'step' || 'smoothstep':
@@ -97,6 +106,8 @@ Range? rangeOf(Expr e, Map<String, Range?> locals) {
         case 'clamp':
           final a = xs[1], b = xs[2];
           return a == null || b == null ? null : a.union(b);
+        case 'mod':
+          return _modRange(args[1]);
         case 'lerp':
           // a + q_mul(b - a, t)
           return rangeOf(Binary('+', args[0], Binary('*', Binary('-', args[1], args[0]), args[2])), locals);
@@ -104,6 +115,16 @@ Range? rangeOf(Expr e, Map<String, Range?> locals) {
           return null;
       }
   }
+}
+
+/// q_mod(a, c) for a whole constant 2 <= |c| <= 4096: within +-(2|c| + 1.0) for every a,
+/// edge effects of q_div's truncation and q_mul's saturation included (checked by brute force
+/// at the extremes of a in test/ranges_test.dart).
+Range? _modRange(Expr c) {
+  if (c is! Num) return null;
+  final m = c.q.abs();
+  if (m & 0xffff != 0 || m < 2 * q1 || m > 4096 * q1) return null;
+  return Range(-2 * m - q1, 2 * m + q1);
 }
 
 /// Ranges of the locals over the whole program (they start at 0, as in C): the union of

@@ -102,40 +102,10 @@ __qsin:
     jplr
 '''),
 
-  // isqrt32 (R8 unsigned) -> R8, the classic bit-pair method.
-  '__isqrt': Routine('''
-__isqrt:                    // floor(sqrt(R8)), the C's digit-by-digit loop; R10 res, R11 bit
-    ldi 0,%R10
-    ldi 1073741824,%R11
-    cmp %R8,%R11
-    jls __isqrt_go          // bit <= v
-__isqrt_top:
-    lsr 2,%R11
-    cmp %R8,%R11
-    jhi __isqrt_top         // bit > v
-    cmpq 0,%R11
-    jz __isqrt_done         // v == 0
-__isqrt_go:
-    lea (%R10,0),%R9
-    add %R11,%R9            // res + bit
-    cmp %R9,%R8
-    jc __isqrt_less         // v < res + bit
-    sub %R9,%R8
-    lsr 1,%R10
-    add %R11,%R10
-    lsr 2,%R11
-    cmpq 0,%R11
-    jnz __isqrt_go
-    jmp __isqrt_done
-__isqrt_less:
-    lsr 1,%R10
-    lsr 2,%R11
-    cmpq 0,%R11
-    jnz __isqrt_go
-__isqrt_done:
-    lea (%R10,0),%R8
-    jplr
-'''),
+  // isqrt32 (R8 unsigned) -> R8, the classic bit-pair method, unrolled: 16 steps from
+  // bit = 2^30 down, entered at the first step whose bit can matter (steps with bit > v leave
+  // res at 0, so starting early is only slower). R10 res, R11 bit.
+  '__isqrt': Routine(_isqrt),
   '__qsqrt': Routine('''
 __qsqrt:
     push %lr
@@ -244,6 +214,47 @@ __vh:                       // R8 = ix, R9 = iy -> 16-bit hash
 /// The assembly for [names] and everything they depend on, each routine once.
 ///
 /// [fast] drops the lines tagged `!fast` (saturation and zero tests).
+String get _isqrt {
+  final b = StringBuffer('''
+__isqrt:                    // floor(sqrt(R8)), the C's digit-by-digit loop
+    ldi 0,%R10
+    cmp 16777216,%R8
+    jnc __isqrt_s0          // v >= 2^24: from bit 2^30
+    cmp 65536,%R8
+    jnc __isqrt_s4          // v >= 2^16: from bit 2^22
+    cmp 256,%R8
+    jnc __isqrt_s8          // v >= 2^8: from bit 2^14
+    ldi 64,%R11
+    jmp __isqrt_k12
+__isqrt_s8:
+    ldi 16384,%R11
+    jmp __isqrt_k8
+__isqrt_s4:
+    ldi 4194304,%R11
+    jmp __isqrt_k4
+__isqrt_s0:
+    ldi 1073741824,%R11
+''');
+  for (var k = 0; k < 16; k++) {
+    b.write('''
+__isqrt_k$k:
+    lea (%R10,0),%R9
+    add %R11,%R9            // res + bit
+    lsr 1,%R10
+    cmp %R9,%R8
+    jc __isqrt_n$k          // v < res + bit
+    sub %R9,%R8
+    add %R11,%R10
+__isqrt_n$k:
+''');
+    if (k < 15) b.writeln('    lsr 2,%R11');
+  }
+  b.write('''    lea (%R10,0),%R8
+    jplr
+''');
+  return b.toString();
+}
+
 String runtimeFor(Iterable<String> names, {bool fast = false}) {
   final want = <String>{};
   void add(String n) {

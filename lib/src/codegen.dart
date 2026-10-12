@@ -73,13 +73,14 @@ class CodeGen {
     // (which clobbers them), %lr only when it calls, and R14 only when it needs the ctx
     // pointer to outlive R8 (a call, or R8 used for anything else).
     final body = StringBuffer();
-    for (final l in _homes.values) {
-      body.writeln('    ldi 0,%R$l');
+    final zero = _readBeforeAssigned();
+    for (final e in _homes.entries) {
+      if (zero.contains(e.key)) body.writeln('    ldi 0,%R${e.value}');
     }
-    for (final o in _slots.values) {
-      body
-        ..writeln('    ldi 0,%R9')
-        ..writeln('    st %R9,(%SP,$o)');
+    final stackZero = [for (final e in _slots.entries) if (zero.contains(e.key)) e.value];
+    if (stackZero.isNotEmpty) body.writeln('    ldi 0,%R9');
+    for (final o in stackZero) {
+      body.writeln('    st %R9,(%SP,$o)');
     }
     body.write(_out);
     // the body runs from `R14 = ctx` to an exit that reads only R8 (the epilogue restores the rest)
@@ -113,6 +114,44 @@ class CodeGen {
     if (lows.isNotEmpty) tail.writeln('    pop ${lows.join(',')}');
     tail.writeln(calls ? '    pop %pc' : '    jplr');
     return '$head$code$tail${runtimeFor(_calls, fast: fast)}';
+  }
+
+  /// Locals that may be read before the body assigns them (they start at 0, as in C, and
+  /// only these need the zeroing): a top-level assignment defines its local for every later
+  /// statement; one inside an `if` defines nothing.
+  Set<String> _readBeforeAssigned() {
+    final defined = <String>{}, out = <String>{};
+    void reads(Expr e) {
+      switch (e) {
+        case Local(:final name):
+          if (!defined.contains(name)) out.add(name);
+        case Unary(:final e):
+          reads(e);
+        case Binary(:final l, :final r):
+          reads(l);
+          reads(r);
+        case Call(:final args):
+          args.forEach(reads);
+        default:
+      }
+    }
+
+    void stmtReads(Stmt s) {
+      switch (s) {
+        case Assign(:final e) || OutAssign(:final e):
+          reads(e);
+        case If(:final cond, :final then, :final otherwise):
+          reads(cond);
+          then.forEach(stmtReads);
+          otherwise.forEach(stmtReads);
+      }
+    }
+
+    for (final s in p.body) {
+      stmtReads(s);
+      if (s is Assign) defined.add(s.name);
+    }
+    return out;
   }
 
   // Every instruction carries `// @L<line>` for the statement it came from (lib/src/analysis.dart
@@ -300,6 +339,15 @@ class CodeGen {
   _V _binary(String op, Expr l, Expr r) {
     switch (op) {
       case '+' || '-':
+        // a constant operand goes in as an immediate (addq when it is small)
+        final fl = _fold(l), fr = _fold(r);
+        if (fr is Num || (fl is Num && op == '+')) {
+          final (x, c) = fr is Num ? (fl, op == '+' ? fr.q : -fr.q) : (fr, (fl as Num).q);
+          final v = _own(_expr(x));
+          final k = c.toSigned(32);
+          if (k != 0) _e(k >= -16 && k <= 15 ? 'addq $k,%R${v.r}' : 'add $k,%R${v.r}');
+          return v;
+        }
         final [la, b] = _exprs([l, r]);
         final a = _own(la);
         _e('${op == '+' ? 'add' : 'sub'} %R${b.r},%R${a.r}');
@@ -324,6 +372,12 @@ class CodeGen {
         if (k != null) {
           final v = _own(_expr(l));
           _divIntReg(v.r, (d as Num).q, k, _range(l));
+          return v;
+        }
+        final f = d is Num ? _fracDivisor(d.q, _range(l)) : null;
+        if (f != null) {
+          final v = _own(_expr(l));
+          _divIntReg(v.r, (d as Num).q, f.$1, _range(l), f.$2);
           return v;
         }
         return _runtime('__qdiv', [l, r]);
@@ -401,7 +455,19 @@ class CodeGen {
         _out.writeln('$l:');
         return v;
       case 'min' || 'max':
-        // a < b ? a : b  /  a > b ? a : b
+        // a < b ? a : b  /  a > b ? a : b; a constant side as an immediate (min and max are
+        // symmetric in value)
+        final f0 = _fold(args[0]), f1 = _fold(args[1]);
+        if (f0 is Num || f1 is Num) {
+          final (x, c) = f1 is Num ? (f0, f1.q) : (f1, (f0 as Num).q);
+          final v = _own(_expr(x));
+          final l = _newLabel();
+          _cmpImm(c, v.r);
+          _e('${fn == 'min' ? 'jlt' : 'jgt'} $l');
+          _e('ldi $c,%R${v.r}');
+          _out.writeln('$l:');
+          return v;
+        }
         final [aa, b] = _exprs(args);
         final a = _own(aa);
         final l = _newLabel();
@@ -413,6 +479,21 @@ class CodeGen {
         return a;
       case 'clamp':
         // x < lo ? lo : (x > hi ? hi : x)
+        final flo = _fold(args[1]), fhi = _fold(args[2]);
+        if (flo is Num && fhi is Num) {
+          final x = _own(_expr(args[0]));
+          final lHi = _newLabel(), lEnd = _newLabel();
+          _cmpImm(flo.q, x.r);
+          _e('jge $lHi');
+          _e('ldi ${flo.q},%R${x.r}');
+          _e('jmp $lEnd');
+          _out.writeln('$lHi:');
+          _cmpImm(fhi.q, x.r);
+          _e('jle $lEnd');
+          _e('ldi ${fhi.q},%R${x.r}');
+          _out.writeln('$lEnd:');
+          return x;
+        }
         final [xx, lo, hi] = _exprs(args);
         final x = _own(xx);
         final lHi = _newLabel(), lEnd = _newLabel();
@@ -682,9 +763,26 @@ class CodeGen {
     return k;
   }
 
+  /// A constant divisor c = +-k * 2^j (k odd, j < 16) with the dividend's range known
+  /// small enough that |x| << (16 - j) stays within 2^31: q_div(x, c) is then
+  /// sign * floor((|x| << (16 - j)) / k), with no saturation. Returns (k, 16 - j).
+  static (int, int)? _fracDivisor(int c, Range? xr) {
+    if (xr == null) return null;
+    final mag = c < 0 ? (-c) & 0xffffffff : c;
+    if (mag == 0 || mag & 0xffff == 0) return null;
+    var j = 0;
+    while ((mag >> j) & 1 == 0) {
+      j++;
+    }
+    final k = mag >> j, s = 16 - j;
+    if (k < 3 || xr.mag > (1 << 31) >> s || magic(k) == null) return null;
+    return (k, s);
+  }
+
   /// R[r] = q_div(R[r], c) for c = +-k (whole, see [_intDivisor]): the high word of |x| * M
-  /// from four 16x16 products, shifted. Uses R8-R13.
-  void _divIntReg(int r, int c, int k, [Range? xr]) {
+  /// from four 16x16 products, shifted. With [shl], |x| << shl over k (see [_fracDivisor]).
+  /// Uses R8-R13.
+  void _divIntReg(int r, int c, int k, [Range? xr, int shl = 0]) {
     final (m, sh) = magic(k)!;
     final mh = m >> 16, ml = m & 0xffff;
     final nonNeg = xr != null && xr.nonNeg;
@@ -696,6 +794,7 @@ class CodeGen {
       _e('neg %R$r');
       _out.writeln('$lAbs:');
     }
+    if (shl > 0) _e('asl $shl,%R$r');
     _e('lea (%R$r,0),%R10');
     _e('lsr 16,%R10'); // xh
     _e('lea (%R$r,0),%R12');
@@ -731,6 +830,9 @@ class CodeGen {
     _out.writeln('$lDone:');
     _e('lea (%R10,0),%R$r');
   }
+
+  /// Flags from R[r] - c.
+  void _cmpImm(int c, int r) => _e(c >= -16 && c <= 15 ? 'cmpq $c,%R$r' : 'cmp $c,%R$r');
 
   static bool _pow2(int c) {
     final mag = c < 0 ? (-c) & 0xffffffff : c;

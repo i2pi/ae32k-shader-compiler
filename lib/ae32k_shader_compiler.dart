@@ -4,6 +4,9 @@ library;
 import 'src/abi.dart';
 import 'src/asm.dart';
 import 'src/codegen.dart';
+import 'src/constprop.dart';
+import 'src/cse.dart';
+import 'src/lower.dart';
 import 'src/lang/ast.dart';
 import 'src/lang/parser.dart';
 import 'src/registers.dart';
@@ -43,17 +46,27 @@ class CompiledStage {
 /// x / 0 gives +-0x7fffffff instead of 0. Everything else is unchanged.
 CompiledStage compileStage(String source, {int slot = 0, bool fast = false, Map<String, Register>? registers}) {
   final Program prog = parse(source, registers: registers);
-  // fewer register-resident locals when an expression runs out of registers
+  final lowered = lowerSmoothstep(eliminateCommon(propagateConstants(prog, fast: fast), fast: fast));
+  // fewer register-resident locals when an expression runs out of registers, or when the
+  // stage would not fit the upload (more locals on the stack can come out smaller)
   String? asm;
-  for (final homes in [6, 3, 0]) {
+  Assembled? best;
+  for (var homes = 6; homes >= 0; homes--) {
+    final String a;
     try {
-      asm = CodeGen(prog, regLocals: homes, fast: fast).generate();
-      break;
+      a = CodeGen(lowered, regLocals: homes, fast: fast).generate();
     } on CompileError catch (e) {
-      if (homes == 0 || !e.message.contains('registers')) rethrow;
+      if ((homes == 0 && asm == null) || !e.message.contains('registers')) rethrow;
+      continue;
     }
+    final c = assemble(a, slotAddr[slot]!);
+    int padded(Assembled x) => (x.bytes.length + 3) & ~3;
+    if (best == null || (padded(best) > maxBlobBytes && padded(c) < padded(best))) {
+      (asm, best) = (a, c);
+    }
+    if (padded(best) <= maxBlobBytes) break;
   }
-  final code = assemble(asm!, slotAddr[slot]!);
+  final code = best!, text = asm!;
   final bytes = [...code.bytes];
   while (bytes.length % 4 != 0) {
     bytes.add(0);
@@ -61,12 +74,12 @@ CompiledStage compileStage(String source, {int slot = 0, bool fast = false, Map<
   if (bytes.length > maxBlobBytes) {
     throw CompileError('stage is ${bytes.length} bytes; the upload limit is $maxBlobBytes');
   }
-  final asmLines = asm.split('\n');
+  final asmLines = text.split('\n');
   final firstRoutine = asmLines.indexWhere((l) => RegExp(r'^__\w+:').hasMatch(l));
   final tag = RegExp(r'// @L(\d+)');
   final sourceLines = <int, int>{
     for (final e in code.lineAddr.entries)
       if (firstRoutine < 0 || e.key <= firstRoutine) e.value: int.parse(tag.firstMatch(asmLines[e.key - 1])?.group(1) ?? '0'),
   };
-  return CompiledStage(slot, bytes, asm, prog.outMap, sourceLines, code.lineAddr);
+  return CompiledStage(slot, bytes, text, prog.outMap, sourceLines, code.lineAddr);
 }
