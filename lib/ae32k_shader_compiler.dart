@@ -19,7 +19,7 @@ export 'src/lang/ast.dart' show OutMapEntry, Program;
 export 'src/lang/eval.dart' show evaluate;
 export 'src/lang/parser.dart' show ShaderSyntaxError, parse;
 export 'src/osc.dart' show oscMessage, oscNoArgTypes, stageParts, knobMessage, scanMapMessage, slotPath;
-export 'src/registers.dart' show Register, parseRegisters, registers;
+export 'src/registers.dart' show Register, parseRegisters, registers, lookupRegister, symbolicRegister, pipFields;
 
 class CompiledStage {
   final int slot;

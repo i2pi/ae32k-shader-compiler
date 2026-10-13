@@ -5,7 +5,8 @@ const registersInc = r'''
 # Columns: name reg mask shift default-mode granularity  description
 # granularity, measured with the timer-synced mid-line probe (docs/MIDLINE_REGISTER_SWEEP.md, 2026-10-12) and the
 # stripe sweep (docs/MIDFRAME_REGISTER_SWEEP.md): pixel = applied within the line at the written pixel; partial =
-# within the line where the content shows it (coefficients, geometry); line = once per line; frame = once per frame.
+# within the line where the content shows it (coefficients, geometry); line = once per line; frame = once per frame;
+# port = an indirect register port where every write counts (no line latching: the resident writes each value).
 # Modes: raw (integer part into the field), gain (x the field's value at map time, 1.0 = unchanged), add, unit
 # (0..1 onto the field range), strobe (write the shift column as a constant after any change).
 
@@ -122,6 +123,16 @@ out1_tp_force_g    0x1CAC 0x1FFF  0 raw    line    OUT1 test-pattern force G
 out1_winmask_en    0x1CAF 0xF000 12 raw    line    OUT1 window mask enable nibble
 out1_winmask_col   0x1CAF 0x00FF  0 raw    line    OUT1 window mask colour index
 
+
+# ---- PIP area blend: not rows here. Use the language's symbolic names, which say which Send and PIP layer:
+#   @out a send1.pip2.area_addr   address port (0x8000 | index; per area k five words at 5k: x0, y0, x1, y1, mode;
+#                                 the ramp increment at 20 + k)
+#   @out d send1.pip2.area_data   data port (each write stores a word and advances the index)
+#   @out w send1.pip2.area_wr     the address port's write strobe only (bit 15, onto a preloaded index)
+#   @out v send1.pip2.area_val    the data port's 13-bit value
+# The firmware resolves them when the map is set: the Send's output channel and the blend stage the layer uses then
+# (it depends on how many PIP layers are on). Mode word: bit 15 enable, bits 14:13 ramp (10 horizontal, 11 vertical)
+# + start in 12:0, or the constant level in 3:0; ramp start and increment are 1/4096 of a full fade (wraps past it).
 
 # ---- tried from the scan engine 2026-10-13 (feature enabled): NOT per pixel; see docs/MIDLINE_REGISTER_SWEEP.md ----
 in_tp_en           0x013D 0x4000 14 raw    frame   input port 0 test pattern generator enable (0x013D = 0xC000 | pattern: 2 h ramp, 3 v ramp, 4 h grey). From the scan engine: the pattern takes over from the first enabled line to the frame end (2026-10-13)

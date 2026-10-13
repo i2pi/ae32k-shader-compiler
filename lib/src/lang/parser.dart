@@ -3,7 +3,7 @@
 // documents (shader.py's accept() only matches operator tokens, so it rejects `else`).
 import '../abi.dart';
 import '../registers.dart' as reg_inc;
-import '../registers.dart' show Register;
+import '../registers.dart' show Register, lookupRegister;
 import 'ast.dart';
 
 class ShaderSyntaxError implements Exception {
@@ -103,7 +103,7 @@ Program parse(String src, {Map<String, Register>? registers}) {
 }
 
 final _outRe = RegExp(r'^\s*@out\s+(\w+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\w+)\s*;?\s*(//.*)?$');
-final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_]\w*)(?:\s+(\w+))?\s*;?\s*(//.*)?$');
+final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_][\w.]*)(?:\s+(\w+))?\s*;?\s*(//.*)?$');
 
 (String, List<OutMapEntry>, Map<String, int>) _outMap(String src, Map<String, Register> registers) {
   final entries = <OutMapEntry>[];
@@ -129,7 +129,13 @@ final _outNamedRe = RegExp(r'^\s*@out\s+(\w+)\s+([A-Za-z_]\w*)(?:\s+(\w+))?\s*;?
       // @out <output> <register name> [mode]: reg, mask, shift from the row, mode from the
       // line or the row's default
       name = mn!.group(1)!;
-      final r = registers[mn.group(2)!] ??
+      final Register? found;
+      try {
+        found = lookupRegister(mn.group(2)!, registers);
+      } on FormatException catch (e) {
+        throw ShaderSyntaxError('@out $name: ${e.message}', i + 1);
+      }
+      final r = found ??
           (throw ShaderSyntaxError('@out $name: unknown register name ${mn.group(2)} (see tools/imcu/registers.inc)', i + 1));
       mode = mn.group(3) ?? r.mode;
       (reg, mask, shift) = (r.reg, r.mask, r.shift);

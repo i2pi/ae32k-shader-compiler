@@ -31,7 +31,12 @@ List<_Decl> _decls(String src) {
       out.add(_Decl(m.group(1)!, 'reg ${f[0]} mask ${f[1]} >> ${f[2]}',
           f.length > 3 ? f[3] : '?', '', i + 1, true));
     } else {
-      final r = registers[f[0]];
+      Register? r;
+      try {
+        r = lookupRegister(f[0]);
+      } on FormatException {
+        r = null;
+      }
       out.add(_Decl(m.group(1)!, f[0], f.length > 1 ? f[1] : (r?.mode ?? '?'),
           r?.granularity ?? '', i + 1, r != null));
     }

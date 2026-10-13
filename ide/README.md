@@ -41,6 +41,14 @@ reply is the number of words the device armed, which the log reports. Then come 
 for a scan stage, the `@out` map. Browsers have no UDP, so the web build edits and measures but
 does not upload.
 
+## Bundles
+
+The editor holds a bundle: one document per stage slot. The WARP / SCAN / VERTEX tabs switch
+between them; each keeps its own text, file and unsaved edits (a dot on the tab). A dim tab is
+empty. New and Open put a stage in its slot and leave the others alone; the x on the shown tab
+removes that stage. Upload sends the shown stage; Simulate runs the whole bundle; an example's
+Run uploads every stage of the bundle, edits included. The bundle is remembered across restarts.
+
 ## Simulator
 
 **Simulate** (Cmd/Ctrl+R) opens a frame simulator that plays stages on a simulated source:
@@ -74,9 +82,10 @@ does not upload.
 
 ## Examples
 
-**Examples** (Cmd/Ctrl+E) browses zephyr_scion's `tools/imcu/examples`. The folder is found
-above the IDE, or chosen with **Folder...**. The entries come from `examples.json` there, one
-per runnable example:
+**Examples** (Cmd/Ctrl+E) browses the examples bundled into the app. They come from this
+repo's `examples/` folder, a copy of zephyr_scion's `tools/imcu/examples` made by
+`dart run tool/sync_examples.dart`; `test/examples_copy_test.dart` fails when the copy is out of
+date. The entries come from `examples.json`, one per example:
 
 ```json
 {"id": "pip/sphere", "title": "Lit sphere", "desc": "...",
@@ -93,10 +102,11 @@ per runnable example:
   or a string starting with "error", "refused" or "busy", counts as a failure. A step can also
   be `{"wait": ms}`. There are no shell-command steps: the device takes no commands over OSC.
   `"kind": "probe"` marks an entry that is not meant to run alone.
-- Without `examples.json`, every `.ss` file is listed. Its slot is guessed from the source,
-  and Run only uploads it.
+- If `examples.json` is missing or unreadable, every `.ss` file is listed, with its slot guessed
+  from the source, and Run only uploads it.
 - Every stage is compiled in the background; the list marks the ones that fail.
-- **Open** loads a stage into the editor, with the example's FAST setting and knobs.
+- **Open** loads the example as a bundle: each of its stages in its own tab (see below), with
+  the example's FAST setting and knobs. Saving a bundled stage asks where to save it.
 - **Run** works as follows:
   1. It compiles every stage first. If one fails, nothing is sent.
   2. It runs the previous example's stop steps, then this example's own stop steps.

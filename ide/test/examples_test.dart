@@ -15,7 +15,23 @@ import 'package:shader_ide/examples_dialog.dart';
 import 'package:shader_ide/osc_decode.dart';
 import 'package:shader_ide/theme.dart';
 
-const _ex = '../../../tools/imcu/examples';
+/// The examples on disk, for the run tests (the app reads them from its bundle).
+class _DiskFiles implements ExampleFiles {
+  final String dir;
+  _DiskFiles(this.dir);
+  @override
+  String get label => dir;
+  @override
+  String path(String rel) => '$dir/$rel';
+  @override
+  bool exists(String rel) => File(path(rel)).existsSync();
+  @override
+  Future<String> text(String rel) => File(path(rel)).readAsString();
+  @override
+  Future<Uint8List> bytes(String rel) => File(path(rel)).readAsBytes();
+  @override
+  Future<List<String>> shaders() async => const [];
+}
 
 const _manifest = '''
 {"examples": [
@@ -107,7 +123,7 @@ void main() {
       File('${dir.path}/v.ss').writeAsStringSync('out.vx = in.x * 10;\nout.vy = 100;\n');
       File('${dir.path}/px.ss').writeAsStringSync('out.dx = in.x;\n');
       File('${dir.path}/r.bin').writeAsBytesSync(List.filled(64, 0));
-      files = ExampleFiles(dir.path);
+      files = _DiskFiles(dir.path);
       ex = parseManifest(_manifest);
     });
     tearDown(() => dir.deleteSync(recursive: true));
@@ -151,12 +167,15 @@ void main() {
     });
   });
 
-  test('every .ss in the examples folder compiles (slot from the source, --fast)', () async {
-    final files = ExampleFiles(_ex);
-    final failed = <String>[];
+  // the bundle: what the app ships (packages/ae32k_shader_compiler/examples/, tool/sync_examples.dart)
+  Future<BundledExamples> bundled(WidgetTester t) async => (await t.runAsync(() => BundledExamples.load()))!;
+
+  testWidgets('every bundled .ss compiles (slot from the source, --fast)', (t) async {
+    final files = await bundled(t);
     final all = await files.shaders();
+    final failed = <String>[];
     for (final rel in all) {
-      final src = await files.text(rel);
+      final src = (await t.runAsync(() => files.text(rel)))!;
       try {
         compileStage(src, slot: guessSlot(src), fast: true);
       } catch (e) {
@@ -167,24 +186,28 @@ void main() {
     expect(failed, isEmpty);
   });
 
-  test('examples.json: parses, every stage compiles, blobs exist, every shader step waits for its reply', () async {
-    final files = ExampleFiles(_ex);
-    if (!files.exists('examples.json')) return markTestSkipped('no examples.json yet');
+  testWidgets('bundled examples.json: parses, stages compile, blobs present, shader steps wait for replies', (t) async {
+    final files = await bundled(t);
+    expect(files.exists('examples.json'), isTrue);
     final errors = <String>[];
-    final ex = parseManifest(await files.text('examples.json'), errors: errors);
+    final ex = parseManifest((await t.runAsync(() => files.text('examples.json')))!, errors: errors);
     expect(errors, isEmpty);
     final bad = <String>[];
     for (final e in ex) {
       for (final MapEntry(key: slot, value: rel) in e.stages.entries) {
         try {
-          final st = compileStage(await files.text(rel), slot: slot, fast: e.fast);
+          final st = compileStage((await t.runAsync(() => files.text(rel)))!, slot: slot, fast: e.fast);
           if (st.outMap.isNotEmpty && slot != 1) bad.add('${e.id}: @out in a ${stageLabels[slot]} stage');
         } catch (x) {
           bad.add('${e.id}: $rel: $x');
         }
       }
       for (final (_, rel) in e.blobs) {
-        if (!files.exists(rel)) bad.add('${e.id}: $rel missing');
+        if (!files.exists(rel)) {
+          bad.add('${e.id}: $rel missing');
+        } else if ((await t.runAsync(() => files.bytes(rel)))!.length % 4 != 0) {
+          bad.add('${e.id}: $rel not a multiple of 4 bytes');
+        }
       }
       if (e.runnable && e.stages.isEmpty && e.blobs.isEmpty) bad.add('${e.id}: nothing to upload');
       for (final s in e.allSteps.whereType<OscStep>()) {
@@ -201,7 +224,7 @@ void main() {
     tester.view.physicalSize = const Size(1400, 860);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final set = (await tester.runAsync(() => ExampleSet.load(_ex)))!;
+    final set = (await tester.runAsync(() async => ExampleSet.load(await BundledExamples.load())))!;
     final root = GlobalKey();
     await tester.pumpWidget(RepaintBoundary(
       key: root,
@@ -209,7 +232,7 @@ void main() {
         debugShowCheckedModeBanner: false,
         theme: Sc.theme(),
         home: Scaffold(
-          body: Builder(builder: (c) => ExamplesDialog(set: set, canRun: true, onChooseDir: (_) {}, selectedId: set.examples.firstWhere((e) => e.id.startsWith('pip/'), orElse: () => set.examples[3]).id)),
+          body: Builder(builder: (c) => ExamplesDialog(set: set, canRun: true, selectedId: set.examples.firstWhere((e) => e.id.startsWith('pip/'), orElse: () => set.examples[3]).id)),
         ),
       ),
     ));

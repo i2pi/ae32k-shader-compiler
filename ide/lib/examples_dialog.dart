@@ -2,7 +2,6 @@
 // .ss file there), grouped by folder, each with a compile check against this compiler. Picking one
 // opens a stage in the editor, runs the example on the device, or simulates it.
 import 'package:ae32k_shader_compiler/ae32k_shader_compiler.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -29,8 +28,7 @@ class ExampleSet {
   final bool fromManifest;
   const ExampleSet(this.files, this.examples, this.errors, this.fromManifest);
 
-  static Future<ExampleSet> load(String dir) async {
-    final files = ExampleFiles(dir);
+  static Future<ExampleSet> load(ExampleFiles files) async {
     final errors = <String>[];
     if (files.exists('examples.json')) {
       try {
@@ -75,9 +73,7 @@ class ExamplesDialog extends StatefulWidget {
   final ExampleSet set;
   final String? selectedId;
   final bool canRun;
-  final ValueChanged<String> onChooseDir;
-  const ExamplesDialog(
-      {super.key, required this.set, this.selectedId, required this.canRun, required this.onChooseDir});
+  const ExamplesDialog({super.key, required this.set, this.selectedId, required this.canRun});
   @override
   State<ExamplesDialog> createState() => _ExamplesDialogState();
 }
@@ -147,6 +143,8 @@ class _ExamplesDialogState extends State<ExamplesDialog> {
     final shown = widget.set.examples
         .where((e) => q.isEmpty || '${e.id} ${e.title} ${e.desc}'.toLowerCase().contains(q))
         .toList();
+    // a selection the filter hides gives way to the first match
+    if (shown.isNotEmpty && !shown.contains(_sel)) _sel = shown.first;
     final failing = widget.set.examples.where((e) => (_status(e) ?? '').isNotEmpty).length;
     return Dialog(
       backgroundColor: Sc.background,
@@ -163,21 +161,13 @@ class _ExamplesDialogState extends State<ExamplesDialog> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    '${widget.set.files.dir}  ·  ${widget.set.examples.length} '
+                    '${widget.set.files.label}  ·  ${widget.set.examples.length} '
                     '${widget.set.fromManifest ? 'from examples.json' : 'stage files (no examples.json: upload only)'}'
                     '${_checking ? '  ·  checking...' : failing == 0 ? '  ·  all compile' : '  ·  $failing do not compile'}',
                     overflow: TextOverflow.ellipsis,
                     style: Sc.uiText(12.5, color: failing > 0 && !_checking ? Sc.amber : Sc.caption),
                   ),
                 ),
-                if (examplesSupported)
-                  TextButton(
-                    onPressed: () async {
-                      final d = await getDirectoryPath(initialDirectory: widget.set.files.dir);
-                      if (d != null) widget.onChooseDir(d);
-                    },
-                    child: Text('Folder...', style: Sc.uiText(13, color: Sc.blue)),
-                  ),
                 TextButton(
                   onPressed: _checking
                       ? null

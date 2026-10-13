@@ -35,6 +35,34 @@ void main() {
     expect(parse('@out a 0x0111 0x0700 8 raw').outMap.single.reg, 0x0111);
   });
 
+  test('per-Send PIP names: symbolic registers the firmware resolves', () {
+    final p = parse('@out a send1.pip2.area_addr\n@out d send3.pip4.area_data\n@out w send1.pip2.area_wr\n'
+        '@out v send2.pip1.area_val gain\nout.a = 1;');
+    final e = p.outMap;
+    expect([for (final x in e) (x.reg, x.mask, x.shift)],
+        [(0xF012, 0xFFFF, 0), (0xF134, 0xFFFF, 0), (0xF012, 0x8000, 15), (0xF121, 0x1FFF, 0)]);
+    expect(e[0].mode, outModes['raw']); // a port: no hold flag
+    expect(e[3].mode, outModes['gain']); // an explicit mode still applies
+    for (final bad in ['send0.pip1.area_addr', 'send4.pip1.area_addr', 'send1.pip5.area_addr', 'send1.pip0.area_data', 'send1.pip1.area_size']) {
+      expect(() => parse('@out a $bad'), throwsA(isA<ShaderSyntaxError>()), reason: bad);
+    }
+    expect(() => parse('@out a send1.pip1'), throwsA(isA<ShaderSyntaxError>())); // not a register name
+  });
+
+  test('per-Send PIP names: shader.py builds the same map', () async {
+    if (!File('$imcu/shader.py').existsSync()) return markTestSkipped('no shader.py');
+    const src = '@out a send1.pip2.area_addr\n@out d send3.pip4.area_data\n@out w send1.pip2.area_wr\n@out v send2.pip1.area_val gain\n';
+    final r = await Process.run('python3', ['-c', '''
+import json, sys
+sys.path.insert(0, "$imcu")
+import shader
+print(json.dumps(shader.parse_outmap(sys.argv[1])[1]))
+''', src]);
+    if (r.exitCode != 0) return markTestSkipped('python3: ${r.stderr}');
+    final want = jsonDecode(r.stdout as String) as List;
+    expect([for (final x in parse(src).outMap) [x.reg, x.mask, x.shift, x.mode, x.slot]], want);
+  });
+
   test("every example's @out map matches shader.py's", () async {
     if (!File('$imcu/shader.py').existsSync()) return markTestSkipped('no shader.py');
     final files = Directory('$imcu/examples').listSync(recursive: true).whereType<File>()

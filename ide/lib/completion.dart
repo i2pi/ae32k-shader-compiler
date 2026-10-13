@@ -81,7 +81,13 @@ CompletionResult? complete(String src, int cursor, int slot) {
     final start = cursor - prefix.length;
     if (field == 1) {
       final items = [
-        for (final r in registers.values)
+        for (final r in [
+          ...registers.values,
+          // per-Send PIP ports (send<N>.pip<M>.<field>), resolved by the firmware
+          for (var send = 1; send <= 3; send++)
+            for (var layer = 1; layer <= 4; layer++)
+              for (final f in pipFields.keys) symbolicRegister('send$send.pip$layer.$f')!,
+        ])
           if (r.name.startsWith(prefix))
             Completion(
                 r.name,

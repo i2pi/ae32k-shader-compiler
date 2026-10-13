@@ -24,6 +24,14 @@ const _stageNames = ['Warp', 'Scan', 'Vertex'];
 const _cyclesPerLine = 3694; // 1080p24 line at 99.75 MHz
 const _cyclesPerPixel = 1.34;
 
+/// One stage of the bundle in the editor: its text, file and unsaved state.
+class _Doc {
+  String text;
+  String? file;
+  bool dirty;
+  _Doc(this.text, [this.file, this.dirty = false]);
+}
+
 class _Req {
   final String src;
   final int slot;
@@ -50,11 +58,15 @@ class _IdePageState extends State<IdePage> {
   bool _fast = false,
       _showAsm = true,
       _showIo = true,
-      _busy = false,
-      _dirty = false;
+      _busy = false;
   int _cursorLine = 1;
   double _asmW = 420;
-  String? _file;
+  // The bundle: one document per stage slot (warp, scan, vertex); the tabs switch between them.
+  final _docs = List<_Doc?>.filled(3, null);
+  _Doc get _cur => _docs[_slot] ??= _Doc('');
+  String? get _file => _docs[_slot]?.file;
+  bool get _dirty => _docs[_slot]?.dirty ?? false;
+  bool _has(int s) => _docs[s] != null && _docs[s]!.text.trim().isNotEmpty;
   StageAnalysis? _analysis;
   Timer? _debounce, _knobSend;
   int _req = 0;
@@ -88,11 +100,24 @@ class _IdePageState extends State<IdePage> {
       _showIo = p.getBool('io') ?? true;
       _asmW = p.getDouble('asmW') ?? 420;
       _host.text = p.getString('host') ?? 'scion.local';
-      _file = p.getString('file');
+      for (var k = 0; k < 3; k++) {
+        final t = p.getString('draft.$k');
+        if (t != null) _docs[k] = _Doc(t, p.getString('file.$k'), p.getBool('dirty.$k') ?? false);
+      }
+      // an older single-buffer draft goes to its slot
+      if (p.getString('draft') case final t? when _docs[_slot] == null) _docs[_slot] = _Doc(t, p.getString('file'));
+      if (_docs.every((d) => d == null)) _docs[slot] = _Doc(src);
+      if (_docs[_slot] == null) _slot = _docs.indexWhere((d) => d != null);
     });
-    _code.text = p.getString('draft') ?? src;
-    _dirty = false;
-    _analyzeNow();
+    _show();
+    final id = p.getString('example');
+    if (id != null) {
+      try {
+        final set = _exSet ??= await ExampleSet.load(await BundledExamples.load());
+        final ex = set.examples.where((e) => e.id == id).firstOrNull;
+        if (ex != null && mounted) setState(() => _example = ex);
+      } catch (_) {}
+    }
   }
 
   void _onEdit() {
@@ -104,10 +129,12 @@ class _IdePageState extends State<IdePage> {
     }
     if (_code.text == _lastText) return;
     _lastText = _code.text;
-    _dirty = true;
+    final d = _cur;
+    d.text = _code.text;
+    if (!d.dirty) setState(() => d.dirty = true);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 220), _analyzeNow);
-    _prefs?.setString('draft', _code.text);
+    _persist(_slot);
   }
 
   String _lastText = '';
@@ -123,22 +150,65 @@ class _IdePageState extends State<IdePage> {
     setState(() => _analysis = a);
   }
 
+  /// Shows another stage of the bundle (an empty one starts blank).
   void _setSlot(int s) {
+    if (s == _slot) return;
     setState(() => _slot = s);
     _prefs?.setInt('slot', s);
+    _show();
+  }
+
+  /// Puts the current slot's document in the editor.
+  void _show() {
+    final t = _docs[_slot]?.text ?? '';
+    _lastText = t; // not an edit
+    _code.text = t;
+    _code.selection = const TextSelection.collapsed(offset: 0);
+    _analysis = null;
     _analyzeNow();
+  }
+
+  /// Replaces the document in [slot] and shows it.
+  void _setDoc(int slot, String text, String? file) {
+    setState(() {
+      _docs[slot] = _Doc(text, file);
+      _slot = slot;
+    });
+    _prefs?.setInt('slot', slot);
+    _persist(slot);
+    _show();
+  }
+
+  void _persist(int k) {
+    final d = _docs[k], p = _prefs;
+    if (p == null) return;
+    if (d == null) {
+      p.remove('draft.$k');
+      p.remove('file.$k');
+      p.remove('dirty.$k');
+      return;
+    }
+    p.setString('draft.$k', d.text);
+    d.file == null ? p.remove('file.$k') : p.setString('file.$k', d.file!);
+    p.setBool('dirty.$k', d.dirty);
+  }
+
+  /// Removes [slot]'s stage from the bundle.
+  void _clearStage(int slot) {
+    setState(() => _docs[slot] = null);
+    _persist(slot);
+    if (slot == _slot) _show();
+  }
+
+  void _setExample(Example? ex) {
+    setState(() => _example = ex);
+    ex == null ? _prefs?.remove('example') : _prefs?.setString('example', ex.id);
   }
 
   static int _guessSlot(String name, String src) {
     final base = name.split(RegExp(r'[/\\]')).last;
     if (base.startsWith('verts') || RegExp(r'^v\d').hasMatch(base)) return 2;
-    if (src.contains('@out') ||
-        base.startsWith('scan') ||
-        base.startsWith('frag') ||
-        RegExp(r'^s\d').hasMatch(base)) {
-      return 1;
-    }
-    return 0;
+    return guessSlot(src);
   }
 
   // ------------------------------------------------------------------ files
@@ -152,19 +222,17 @@ class _IdePageState extends State<IdePage> {
     final f = await openFile(acceptedTypeGroups: _types);
     if (f == null) return;
     final src = await f.readAsString();
-    setState(() {
-      _file = f.path.isEmpty ? f.name : f.path;
-      _slot = _guessSlot(f.name, src);
-    });
-    _code.text = src;
-    _dirty = false;
-    _prefs?.setString('file', _file!);
-    _say('opened ${f.name} (${_stageNames[_slot].toLowerCase()} stage)');
+    final slot = _guessSlot(f.name, src);
+    _leaveExampleFor(slot);
+    _setDoc(slot, src, f.path.isEmpty ? f.name : f.path);
+    _say('opened ${f.name} (${_stageNames[slot].toLowerCase()} stage)');
   }
 
   Future<void> _save({bool as = false}) async {
     var path = _file;
-    if (as || path == null || kIsWeb) {
+    // a bundled example has no path on disk: Save As
+    final onDisk = path != null && (path.startsWith('/') || RegExp(r'^[A-Za-z]:[\\/]').hasMatch(path));
+    if (as || !onDisk || kIsWeb) {
       final loc = await getSaveLocation(
           acceptedTypeGroups: _types,
           suggestedName: path?.split(RegExp(r'[/\\]')).last ?? 'stage.ss');
@@ -175,22 +243,23 @@ class _IdePageState extends State<IdePage> {
             mimeType: 'text/plain', name: path.split('/').last)
         .saveTo(path);
     setState(() {
-      _file = path;
-      _dirty = false;
+      _cur.file = path;
+      _cur.dirty = false;
     });
-    _prefs?.setString('file', path);
+    _persist(_slot);
     _say('saved $path');
   }
 
   void _newFrom(String name) {
     final (slot, src) = templates[name]!;
-    setState(() {
-      _file = null;
-      _slot = slot;
-    });
-    _code.text = src;
-    _dirty = false;
-    _prefs?.remove('file');
+    _leaveExampleFor(slot);
+    _setDoc(slot, src, null);
+  }
+
+  /// Replacing one of the example's stages with something else ends the example (the bundle
+  /// keeps its other stages).
+  void _leaveExampleFor(int slot) {
+    if (_example?.stages.containsKey(slot) ?? false) _setExample(null);
   }
 
   // ----------------------------------------------------------------- device
@@ -262,42 +331,18 @@ class _IdePageState extends State<IdePage> {
 
   // --------------------------------------------------------------- examples
 
-  Future<ExampleSet?> _loadExamples({String? dir}) async {
-    final d = dir ?? findExamplesDir(_prefs?.getString('examplesDir'));
-    if (d == null) return null;
-    final set = await ExampleSet.load(d);
-    _prefs?.setString('examplesDir', d);
-    if (mounted) setState(() => _exSet = set);
-    return set;
-  }
-
   Future<void> _examples() async {
-    if (!examplesSupported) {
-      _say('the examples browser needs the desktop app (no file access in a browser)');
+    ExampleSet set;
+    try {
+      set = _exSet ??= await ExampleSet.load(await BundledExamples.load());
+    } catch (e) {
+      _say('cannot load the bundled examples: $e');
       return;
     }
-    final set = _exSet ?? await _loadExamples();
     if (!mounted) return;
-    if (set == null) {
-      _say('no tools/imcu/examples folder found; choose it in the Examples browser');
-    }
     final pick = await showDialog<ExampleChoice>(
       context: context,
-      builder: (c) => set == null
-          ? _NoExamples(onChoose: (d) async {
-              Navigator.pop(c);
-              await _loadExamples(dir: d);
-              _examples();
-            })
-          : ExamplesDialog(
-              set: set,
-              selectedId: _example?.id,
-              canRun: deviceSupported,
-              onChooseDir: (d) async {
-                Navigator.pop(c);
-                await _loadExamples(dir: d);
-                _examples();
-              }),
+      builder: (c) => ExamplesDialog(set: set, selectedId: _example?.id, canRun: deviceSupported),
     );
     if (pick == null || !mounted) return;
     final ex = pick.example;
@@ -305,55 +350,53 @@ class _IdePageState extends State<IdePage> {
       case ExampleAction.open:
         await _openExample(ex, pick.slot ?? ex.primarySlot!);
       case ExampleAction.run:
-        if (ex.primarySlot case final s? when !_holdsExample(ex)) await _openExample(ex, s);
-        setState(() => _example = ex);
+        if (_example?.id != ex.id) await _openExample(ex, ex.primarySlot ?? _slot);
         await _runExample();
       case ExampleAction.simulate:
-        if (ex.primarySlot case final s? when !_holdsExample(ex)) await _openExample(ex, s);
+        if (_example?.id != ex.id) await _openExample(ex, ex.primarySlot ?? _slot);
         await _simulateExample(ex);
     }
   }
 
-  /// Whether the editor holds one of [ex]'s stage files.
-  bool _holdsExample(Example ex) {
-    final f = _exSet?.files;
-    return f != null && ex.stages.values.any((r) => f.path(r) == _file);
-  }
-
+  /// Opens [ex] as the bundle: every one of its stages in its slot (the other slots emptied),
+  /// [slot] shown, and its FAST setting and knobs.
   Future<void> _openExample(Example ex, int slot) async {
-    final set = _exSet!, rel = ex.stages[slot]!;
-    final String src;
-    try {
-      src = await set.files.text(rel);
-    } catch (e) {
-      _say('$rel: cannot read ($e)');
-      return;
+    final set = _exSet!;
+    final docs = <int, _Doc>{};
+    for (final MapEntry(key: s, value: rel) in ex.stages.entries) {
+      try {
+        docs[s] = _Doc(await set.files.text(rel), set.files.path(rel));
+      } catch (e) {
+        _say('$rel: cannot read ($e)');
+        return;
+      }
     }
+    if (!mounted) return;
     setState(() {
-      _example = ex;
-      _file = set.files.path(rel);
-      _slot = slot;
+      for (var k = 0; k < 3; k++) {
+        _docs[k] = docs[k];
+      }
+      _slot = ex.stages.containsKey(slot) ? slot : (ex.primarySlot ?? _slot);
       _fast = ex.fast;
       for (var k = 0; k < 8; k++) {
         _knobs[k] = ex.knobs[k] ?? 0;
       }
     });
-    _code.text = src;
-    _dirty = false;
-    _prefs?.setString('file', _file!);
-    _prefs?.setInt('slot', slot);
+    for (var k = 0; k < 3; k++) {
+      _persist(k);
+    }
+    _prefs?.setInt('slot', _slot);
     _prefs?.setBool('fast', _fast);
-    _say('opened ${ex.title}: $rel (${_stageNames[slot].toLowerCase()} stage)');
+    _setExample(ex);
+    _show();
+    _say('opened ${ex.title}: ${[for (final s in [0, 2, 1]) if (ex.stages[s] case final r?) '${stageLabels[s]} $r'].join(', ')}');
   }
 
-  /// The editor's buffer for the example stage it holds, so a run uses the edited text.
-  Map<String, String> _editorSources(Example ex) {
-    final f = _exSet?.files;
-    return {
-      for (final r in ex.stages.values)
-        if (f != null && f.path(r) == _file) r: _code.text,
-    };
-  }
+  /// The bundle's text for each of [ex]'s stages, so a run uses the edits.
+  Map<String, String> _editorSources(Example ex) => {
+        for (final MapEntry(key: s, value: rel) in ex.stages.entries)
+          if (_docs[s] case final d?) rel: d.text,
+      };
 
   Future<void> _runExample() async {
     final ex = _example, set = _exSet;
@@ -411,7 +454,12 @@ class _IdePageState extends State<IdePage> {
     ));
   }
 
+  /// Simulates the bundle (the example's, with its placement, when one is open).
   void _simulate() {
+    if (_example case final ex?) {
+      _simulateExample(ex);
+      return;
+    }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => SimPage(
         editorSource: _code.text,
@@ -419,6 +467,10 @@ class _IdePageState extends State<IdePage> {
         editorName: _file?.split(RegExp(r'[/\\]')).last ?? 'untitled',
         knobs: _knobs,
         fast: _fast,
+        stages: {
+          for (var k = 0; k < 3; k++)
+            if (_has(k)) k: SimStageRef(_docs[k]!.file?.split(RegExp(r'[/\\]')).last ?? 'untitled', _docs[k]!.text),
+        },
       ),
     ));
   }
@@ -465,6 +517,7 @@ class _IdePageState extends State<IdePage> {
         body: Column(
           children: [
             _toolbar(),
+            if (_example != null) _exampleBar(_example!),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -544,7 +597,17 @@ class _IdePageState extends State<IdePage> {
                 style: Sc.uiText(14, color: Sc.label)),
           ),
           const SizedBox(width: 16),
-          _Segmented(labels: _stageNames, selected: _slot, onSelect: _setSlot),
+          _StageTabs(
+            labels: _stageNames,
+            selected: _slot,
+            present: [for (var k = 0; k < 3; k++) _has(k)],
+            dirty: [for (var k = 0; k < 3; k++) _docs[k]?.dirty ?? false],
+            onSelect: _setSlot,
+            onClear: (k) {
+              _leaveExampleFor(k);
+              _clearStage(k);
+            },
+          ),
           const SizedBox(width: 10),
           Tooltip(
             message:
@@ -577,7 +640,6 @@ class _IdePageState extends State<IdePage> {
           const SizedBox(width: 10),
           _Btn(icon: Icons.play_circle_outline, label: 'Simulate', onTap: _simulate),
           const Spacer(),
-          if (_example != null) _exampleChip(_example!),
           if (deviceSupported) ...[
             Container(
               width: 9,
@@ -627,49 +689,58 @@ class _IdePageState extends State<IdePage> {
     );
   }
 
-  /// The current example, with Run and Stop.
-  Widget _exampleChip(Example ex) {
+  /// The current example, under the toolbar: Run, Stop, Simulate and the step it is on.
+  Widget _exampleBar(Example ex) {
     final running = _runner.running?.id == ex.id;
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.fromLTRB(10, 2, 2, 2),
-      decoration: BoxDecoration(
-          color: Sc.inset, borderRadius: BorderRadius.circular(7)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
-          child: Tooltip(
-            message: ex.id,
-            child: Text(ex.title,
-                overflow: TextOverflow.ellipsis,
-                style: Sc.uiText(13, color: running ? Sc.green : Sc.label)),
+    Widget btn(IconData icon, String label, Color color, VoidCallback? onTap, String tip) => Tooltip(
+          message: tip,
+          child: TextButton.icon(
+            onPressed: onTap,
+            icon: Icon(icon, size: 17, color: onTap == null ? Sc.faint : color),
+            label: Text(label, style: Sc.uiText(13, color: onTap == null ? Sc.faint : Sc.label)),
           ),
+        );
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+          color: Sc.inset, border: Border(bottom: BorderSide(color: Colors.black38))),
+      child: Row(children: [
+        Text('EXAMPLE', style: Sc.caps(11)),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(ex.title,
+              overflow: TextOverflow.ellipsis,
+              style: Sc.uiText(13.5, color: running ? Sc.green : Sc.text)),
         ),
-        IconButton(
-          tooltip: 'Run the example on the device (stages, blobs, knobs, setup, start)',
-          visualDensity: VisualDensity.compact,
-          onPressed: deviceSupported && ex.runnable && !_exBusy ? _runExample : null,
-          icon: _exBusy
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.play_arrow, size: 18, color: Sc.green),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+              '${running ? 'running' : ex.id}${_file == null ? '' : '  ·  ${_file!.split(RegExp(r'[/\\]')).last}'}',
+              overflow: TextOverflow.ellipsis,
+              style: Sc.uiText(12.5, color: running ? Sc.green : Sc.faint)),
         ),
-        IconButton(
-          tooltip: 'Run the example\'s stop steps',
-          visualDensity: VisualDensity.compact,
-          onPressed: running && !_exBusy ? _stopExample : null,
-          icon: Icon(Icons.stop, size: 18, color: running ? Sc.red : Sc.faint),
-        ),
-        IconButton(
-          tooltip: 'Simulate the example',
-          visualDensity: VisualDensity.compact,
-          onPressed: () => _simulateExample(ex),
-          icon: const Icon(Icons.play_circle_outline, size: 17, color: Sc.label),
-        ),
+        const Spacer(),
+        if (_exBusy) ...[
+          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Text(_log.isEmpty ? '' : _log.first.replaceFirst(RegExp(r'^\S+ \S*\s+'), ''),
+                overflow: TextOverflow.ellipsis, style: Sc.uiText(12.5, color: Sc.caption)),
+          ),
+          const SizedBox(width: 8),
+        ],
+        btn(Icons.play_arrow, 'Run', Sc.green, deviceSupported && ex.runnable && !_exBusy && !_busy ? _runExample : null,
+            'Upload the stages and blobs, then the setup and start steps'),
+        btn(Icons.stop, 'Stop', Sc.red, running && !_exBusy ? _stopExample : null, "Run the example's stop steps"),
+        btn(Icons.play_circle_outline, 'Simulate', Sc.label, ex.stages.isEmpty ? null : () => _simulateExample(ex),
+            'Simulate the example'),
         IconButton(
           tooltip: 'Close the example',
           visualDensity: VisualDensity.compact,
-          onPressed: () => setState(() => _example = null),
-          icon: const Icon(Icons.close, size: 15, color: Sc.faint),
+          onPressed: () => _setExample(null),
+          icon: const Icon(Icons.close, size: 16, color: Sc.faint),
         ),
       ]),
     );
@@ -974,12 +1045,21 @@ class _Toggle extends StatelessWidget {
       );
 }
 
-class _Segmented extends StatelessWidget {
+/// The bundle's stages: WARP / SCAN / VERTEX, each its own document. A stage with code is
+/// bright (a dot when it has unsaved edits); an empty one is dim. The shown stage has an x that
+/// removes it from the bundle.
+class _StageTabs extends StatelessWidget {
   final List<String> labels;
   final int selected;
-  final ValueChanged<int> onSelect;
-  const _Segmented(
-      {required this.labels, required this.selected, required this.onSelect});
+  final List<bool> present, dirty;
+  final ValueChanged<int> onSelect, onClear;
+  const _StageTabs(
+      {required this.labels,
+      required this.selected,
+      required this.present,
+      required this.dirty,
+      required this.onSelect,
+      required this.onClear});
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(2),
@@ -987,22 +1067,48 @@ class _Segmented extends StatelessWidget {
             color: Sc.inset, borderRadius: BorderRadius.circular(7)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           for (var i = 0; i < labels.length; i++)
-            InkWell(
-              onTap: () => onSelect(i),
-              borderRadius: BorderRadius.circular(5),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: i == selected
-                      ? Color.lerp(const Color(0xFF3A3A3C), Sc.blue, 0.85)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
+            Tooltip(
+              message: present[i]
+                  ? '${labels[i]} stage${dirty[i] ? ' (unsaved edits)' : ''}'
+                  : '${labels[i]} stage: empty (New or Open puts one here)',
+              child: InkWell(
+                onTap: () => onSelect(i),
+                borderRadius: BorderRadius.circular(5),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(12, 6, i == selected && present[i] ? 4 : 12, 6),
+                  decoration: BoxDecoration(
+                    color: i == selected
+                        ? Color.lerp(const Color(0xFF3A3A3C), Sc.blue, 0.85)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(labels[i].toUpperCase(),
+                        style: Sc.caps(12,
+                            color: i == selected
+                                ? Colors.black
+                                : (present[i] ? Sc.label : Sc.faint),
+                            weight: FontWeight.w700)),
+                    if (dirty[i] && present[i])
+                      Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: i == selected ? Colors.black : Sc.amber)),
+                      ),
+                    if (i == selected && present[i])
+                      InkWell(
+                        onTap: () => onClear(i),
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 6, right: 2),
+                          child: Icon(Icons.close, size: 13, color: Colors.black54),
+                        ),
+                      ),
+                  ]),
                 ),
-                child: Text(labels[i].toUpperCase(),
-                    style: Sc.caps(12,
-                        color: i == selected ? Colors.black : Sc.label,
-                        weight: FontWeight.w700)),
               ),
             ),
         ]),
@@ -1066,30 +1172,5 @@ class _DragDivider extends StatelessWidget {
             child: Center(child: Container(width: 1, color: Colors.black38)),
           ),
         ),
-      );
-}
-
-class _NoExamples extends StatelessWidget {
-  final ValueChanged<String> onChoose;
-  const _NoExamples({required this.onChoose});
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-        backgroundColor: Sc.card,
-        title: Text('Examples', style: Sc.uiText(16, color: Sc.text)),
-        content: Text(
-            'No tools/imcu/examples folder was found above the IDE. Choose the examples folder of a zephyr_scion checkout.',
-            style: Sc.uiText(14)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              final d = await getDirectoryPath();
-              if (d != null) onChoose(d);
-            },
-            child: const Text('Choose folder...'),
-          ),
-        ],
       );
 }

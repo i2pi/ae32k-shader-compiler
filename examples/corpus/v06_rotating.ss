@@ -1,0 +1,52 @@
+// Rotating checkerboard: the 18 'on' squares of a 6 x 6 board, rotated about the centre. Each square is
+// three trapezoids split at its side corners (top triangle, middle, bottom triangle); each trapezoid's left
+// and right edges follow the square's sides exactly (vdx, vdw), so the edges are straight at any angle.
+// Geometry in fractions of the height; the board's centre is at (0.889, 0.45). k2 adds to the angle (turns).
+let cell = floor(in.x / 3);
+let pc = mod(in.x, 3);
+let row = floor(cell / 3);
+let col = mod(cell, 3) * 2 + mod(row, 2);
+let s = 0.1;
+let a = in.t * 0.02 + in.k2;
+let c = cos(a);
+let sn = sin(a);
+let gx = (col - 2.5) * s;
+let gy = (row - 2.5) * s;
+let cx = 0.8889 + gx * c - gy * sn;
+let cy = 0.45 + gx * sn + gy * c;
+let ap = mod(a, 0.25) + 0.125;
+let hd = s * 0.7071;
+let xB = cx + hd * cos(ap);
+let yB = cy + hd * sin(ap);
+let xL = cx + hd * cos(ap + 0.25);
+let yL = cy + hd * sin(ap + 0.25);
+let xT = cx + hd * cos(ap + 0.5);
+let yT = cy + hd * sin(ap + 0.5);
+let xR = cx + hd * cos(ap + 0.75);
+let yR = cy + hd * sin(ap + 0.75);
+let m1 = min(yL, yR);
+let m2 = max(yL, yR);
+let e0 = 1 - step(0.5, pc);
+let e2 = step(1.5, pc);
+let e1 = 1 - e0 - e2;
+let top = max(yT * e0 + m1 * e1 + m2 * e2, 0.002);
+let bot = min(m1 * e0 + m2 * e1 + yB * e2, 0.88);
+let la = floor(top * 1080);
+let lb = floor(bot * 1080);
+let lines = lb - la;
+let ok = step(0.5, lines);
+let ya = (la + 0.5) / 1080;
+let yb = (lb + 0.5) / 1080;
+let la0 = (xL - xT) * clamp((ya - yT) / max(yL - yT, 0.0002), 0, 1) + (xB - xL) * clamp((ya - yL) / max(yB - yL, 0.0002), 0, 1);
+let lb0 = (xL - xT) * clamp((yb - yT) / max(yL - yT, 0.0002), 0, 1) + (xB - xL) * clamp((yb - yL) / max(yB - yL, 0.0002), 0, 1);
+let ra0 = (xR - xT) * clamp((ya - yT) / max(yR - yT, 0.0002), 0, 1) + (xB - xR) * clamp((ya - yR) / max(yB - yR, 0.0002), 0, 1);
+let rb0 = (xR - xT) * clamp((yb - yT) / max(yR - yT, 0.0002), 0, 1) + (xB - xR) * clamp((yb - yR) / max(yB - yR, 0.0002), 0, 1);
+let n = max(lines, 1);
+out.vx = (xT + la0) * 1080;
+out.vy = la * ok + 1124 * (1 - ok);
+out.p0 = 1;
+out.p1 = mod(row + cell, 3) / 2;
+out.p2 = max(ra0 - la0, 0) * 1080 + 1;
+out.p3 = n;
+out.vdx = (lb0 - la0) * 1080 / n;
+out.vdw = ((rb0 - lb0) - (ra0 - la0)) * 1080 / n;

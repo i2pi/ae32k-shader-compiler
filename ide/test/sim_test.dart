@@ -12,7 +12,7 @@ import 'package:shader_ide/sim/sim_page.dart';
 import 'package:shader_ide/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _ex = '../../../tools/imcu/examples';
+const _ex = '../examples'; // this repo's copy (tool/sync_examples.dart)
 String _read(String p) => File('$_ex/$p').readAsStringSync();
 
 // one cell at (100, 100), 200 x 50, whose scan stage halves the output CSC Y row (line-latched)
@@ -69,6 +69,16 @@ void main() {
     final k = 10 * wf.nx + 20;
     expect(wf.sx[k], 20 * 16 + 10);
     expect(wf.sy[k], 10 * 16 - 64.0);
+  });
+
+  test('a per-Send PIP port: named, a port (not per pixel), drawn as a trace', () {
+    final e = SimEngine(w: 1920, h: 1080, fps: 24, fast: false, vertex: _oneCell,
+        scan: '@out a send1.pip2.area_addr\n@out d send1.pip2.area_data\nout.a = 1;\nout.d = in.p0;\n', points: 2);
+    expect(e.errors, isEmpty);
+    final o = e.frame(0, const {}).outputs;
+    expect(o.map((x) => x.target), ['send1.pip2.area_addr', 'send1.pip2.area_data']);
+    expect(o.first.reg, 0xF012);
+    expect(o.every((x) => !x.pixel && !x.modelled && !x.hold), isTrue);
   });
 
   Future<void> page(WidgetTester tester, String shot, Map<int, String> stages, {int editorSlot = 2}) async {

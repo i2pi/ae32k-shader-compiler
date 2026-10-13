@@ -1,0 +1,10 @@
+// Test shape: 8 columns x 20 rows of 240x15 cells over rows 400..699; p0 = column / 8 (0, 0.125 .. 0.875).
+let col = in.x - 8 * floor(in.x / 8);
+let row = floor(in.x / 8);
+out.vx = col * 240;
+out.vy = 400 + row * 15;
+out.p0 = col / 8;
+out.p2 = 240;
+out.p3 = 15;
+out.vdx = 0;
+out.vdw = 0;

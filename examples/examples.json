@@ -1,0 +1,4076 @@
+{
+ "version": 1,
+ "examples": [
+  {
+   "id": "cells/ml01_swap_perm+sh01_circle",
+   "title": "Input channel permutation (Y and Cr swapped) inside a circle (circle)",
+   "desc": "Input channel permutation (Y and Cr swapped) inside a circle, per pixel",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 0
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+sh02_diamond",
+   "title": "Cb and Cr swapped inside a diamond (diamond)",
+   "desc": "Cb and Cr swapped inside a diamond, per pixel",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh02_diamond.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 1
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      2
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+v06_rotating",
+   "title": "A rotating checkerboard of swapped channels (rotating checkerboard)",
+   "desc": "A rotating checkerboard of swapped channels: sloped cell edges evaluated every line",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v06_rotating.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 0
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      54
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+sh03_sine_ribbon",
+   "title": "MSB/LSB swap along a sine ribbon (sine ribbon)",
+   "desc": "MSB/LSB swap along a sine ribbon",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh03_sine_ribbon.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 2
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      64
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+v01_ripple_grid",
+   "title": "Y/Cb swap on a rippling grid (ripple grid)",
+   "desc": "Y/Cb swap on a rippling grid",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v01_ripple_grid.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": -1,
+    "k0": 1
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      80
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+v10_rain",
+   "title": "60 falling cells (rain)",
+   "desc": "60 falling cells",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v10_rain.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 3
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      60
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+sh08_scanning_bar",
+   "title": "A scanning bar of swapped channels (scanning bar)",
+   "desc": "A scanning bar of swapped channels",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh08_scanning_bar.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 4
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      64
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml01_swap_perm+v19_shear",
+   "title": "Cb/Cr swap on a shearing grid (shear grid)",
+   "desc": "Cb/Cr swap on a shearing grid",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v19_shear.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 1,
+    "k0": 1
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      80
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml02_swap_rows+v05_breathing",
+   "title": "Channel permutation chosen per row of a breathing grid (breathing grid)",
+   "desc": "Channel permutation chosen per row of a breathing grid",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v05_breathing.ss",
+    "scan": "showcase/ml02_swap_rows.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      80
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml02_swap_rows+sh01_circle",
+   "title": "Channel permutation per row inside a circle (circle)",
+   "desc": "Channel permutation per row inside a circle",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "showcase/ml02_swap_rows.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml03_cbcr_swap+sh06_rings",
+   "title": "Input CbCr swap on rings (rings)",
+   "desc": "Input CbCr swap on rings",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh06_rings.ss",
+    "scan": "showcase/ml03_cbcr_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml03_cbcr_swap+sh05_bouncing_ball",
+   "title": "Input CbCr swap on a bouncing ball (bouncing ball)",
+   "desc": "Input CbCr swap on a bouncing ball",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh05_bouncing_ball.ss",
+    "scan": "showcase/ml03_cbcr_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      28
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml04_yc_offset+sh07_triangle",
+   "title": "Chroma delayed against luma inside a triangle (triangle)",
+   "desc": "Chroma delayed against luma inside a triangle",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh07_triangle.ss",
+    "scan": "showcase/ml04_yc_offset.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      1
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml04_yc_offset+v20_noise_falloff",
+   "title": "Chroma delay on a noise grid (noise grid)",
+   "desc": "Chroma delay on a noise grid",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v20_noise_falloff.ss",
+    "scan": "showcase/ml04_yc_offset.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      80
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml05_fieldid+sh04_diagonal_stripes",
+   "title": "Field-ID bypass on diagonal stripes (diagonal stripes)",
+   "desc": "Field-ID bypass on diagonal stripes",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh04_diagonal_stripes.ss",
+    "scan": "showcase/ml05_fieldid.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      6
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml06_demux+sh05_bouncing_ball",
+   "title": "Input demux order (chroma first) inside a bouncing ball (bouncing ball)",
+   "desc": "Input demux order (chroma first) inside a bouncing ball",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh05_bouncing_ball.ss",
+    "scan": "showcase/ml06_demux.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      28
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml07_prec+v13_phyllotaxis",
+   "title": "Input mux precision on a phyllotaxis pattern (phyllotaxis)",
+   "desc": "Input mux precision on a phyllotaxis pattern",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v13_phyllotaxis.ss",
+    "scan": "showcase/ml07_prec.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      80
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml07_prec+sh02_diamond",
+   "title": "Input mux precision inside a diamond (diamond)",
+   "desc": "Input mux precision inside a diamond",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh02_diamond.ss",
+    "scan": "showcase/ml07_prec.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      2
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml08_mode_sel+sh08_scanning_bar",
+   "title": "Input mode select on a scanning bar (scanning bar)",
+   "desc": "Input mode select on a scanning bar",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh08_scanning_bar.ss",
+    "scan": "showcase/ml08_mode_sel.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      64
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml09_port_sel+sh01_circle",
+   "title": "Input port select inside a circle (circle)",
+   "desc": "Input port select inside a circle",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "showcase/ml09_port_sel.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml09_port_sel+sh06_rings",
+   "title": "Input port select on rings (rings)",
+   "desc": "Input port select on rings",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh06_rings.ss",
+    "scan": "showcase/ml09_port_sel.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/ml10_wmc_force+sh04_diagonal_stripes",
+   "title": "Write-controller control byte on diagonal stripes (diagonal stripes)",
+   "desc": "Write-controller control byte on diagonal stripes",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh04_diagonal_stripes.ss",
+    "scan": "showcase/ml10_wmc_force.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      6
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/pl01_tint+sh06_rings",
+   "title": "Per line (rings)",
+   "desc": "Per line: output CSC offsets plus the swap, on rings",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh06_rings.ss",
+    "scan": "showcase/pl01_tint.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/pl01_tint+sh02_diamond",
+   "title": "Per line (diamond)",
+   "desc": "Per line: CSC offsets plus the swap, inside a diamond",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh02_diamond.ss",
+    "scan": "showcase/pl01_tint.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      2
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/pl02_dark_blinds+sh07_triangle",
+   "title": "Per line (triangle)",
+   "desc": "Per line: dark-screen blinds plus the swap, inside a triangle",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh07_triangle.ss",
+    "scan": "showcase/pl02_dark_blinds.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      1
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "cells/pt01_csc_gain+sh01_circle",
+   "title": "Input CSC gains inside a circle (partial (circle)",
+   "desc": "Input CSC gains inside a circle (partial: shows where the picture has colour)",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "showcase/pt01_csc_gain.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx01_swap",
+   "title": "Swap inside a circle",
+   "desc": "Swap inside a circle (circle).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "shapes/fx01_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx02_swap_dark",
+   "title": "Swap inside a circle, its lines blinking dark",
+   "desc": "Swap inside a circle, its lines blinking dark (circle).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "shapes/fx02_swap_dark.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx03_swap_gain",
+   "title": "Swap inside a circle with the output Y gain pulsing per line",
+   "desc": "Swap inside a circle with the output Y gain pulsing per line (circle).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "shapes/fx03_swap_gain.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx04_offset_bands",
+   "title": "Output Y and Cb offsets per line on a circle's lines",
+   "desc": "Output Y and Cb offsets per line on a circle's lines (circle).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "shapes/fx04_offset_bands.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx05_peaking_blinds",
+   "title": "Horizontal peaking per line, with a CbCr swap every 8th line",
+   "desc": "Horizontal peaking per line, with a CbCr swap every 8th line (circle).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh01_circle.ss",
+    "scan": "shapes/fx05_peaking_blinds.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx10_hsize_wave",
+   "title": "Forced MFC line width breathing along a travelling sine",
+   "desc": "Forced MFC line width breathing along a travelling sine (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx10_hsize_wave.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx11_lift_tint",
+   "title": "A lifted, tinted band sweeping down",
+   "desc": "A lifted, tinted band sweeping down (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx11_lift_tint.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx12_blinds",
+   "title": "Dark-screen venetian blinds",
+   "desc": "Dark-screen venetian blinds (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx12_blinds.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx13_peaking_sweep",
+   "title": "A razor-sharp band sweeping through a soft picture",
+   "desc": "A razor-sharp band sweeping through a soft picture (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx13_peaking_sweep.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx14_force_green",
+   "title": "Green forced to a per-line value in two moving bands",
+   "desc": "Green forced to a per-line value in two moving bands (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx14_force_green.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx15_csc_rainbow",
+   "title": "A rainbow of input CSC tints rolling down",
+   "desc": "A rainbow of input CSC tints rolling down (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx15_csc_rainbow.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "fx/fx16_chroma_swap_bands",
+   "title": "CbCr swap on drifting stripes",
+   "desc": "CbCr swap on drifting stripes (line bands).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/bands.ss",
+    "scan": "shapes/fx16_chroma_swap_bands.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      96
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "motion/follow",
+   "title": "Motion follow",
+   "desc": "A disc on the motion centroid, sized by the amount of motion (needs a moving picture on Send 1). Uses Send 1's frame buffer in its linear layout: if a warp or rotation has been used since boot, starting switches it back (the output flashes white once); refused while a warp or rotation is on.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh09_motion_follow.ss",
+    "scan": "showcase/ml01_swap_perm.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k0": 3.0,
+    "k2": 0
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/motion",
+     "types": "iiiii",
+     "args": [
+      16,
+      9,
+      64,
+      200,
+      40
+     ],
+     "reply": "/send/1/shader/motion"
+    },
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/motion",
+     "types": "i",
+     "args": [
+      0
+     ],
+     "reply": "/send/1/shader/motion"
+    }
+   ]
+  },
+  {
+   "id": "motion/heat",
+   "title": "Motion heat cells",
+   "desc": "Cells swap channels where the picture moves (needs a moving picture on Send 1). Uses Send 1's frame buffer in its linear layout: if a warp or rotation has been used since boot, starting switches it back (the output flashes white once); refused while a warp or rotation is on.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v21_heat_cells.ss",
+    "scan": "showcase/ml12_heat_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k1": 0.0,
+    "k2": 1
+   },
+   "setup": [
+    {
+     "osc": "/send/1/shader/motion",
+     "types": "iiiii",
+     "args": [
+      8,
+      9,
+      64,
+      200,
+      40
+     ],
+     "reply": "/send/1/shader/motion"
+    },
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      72
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/motion",
+     "types": "i",
+     "args": [
+      0
+     ],
+     "reply": "/send/1/shader/motion"
+    }
+   ]
+  },
+  {
+   "id": "grad/g01_linear",
+   "title": "Linear gradient",
+   "desc": "12 levels along each line from 4 per-pixel bits (16-level palette); the angle rocks. k0 extra angle, k1 spacing.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "grad/g01_linear.ss",
+    "scan": "grad/g00_levels16.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      48
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "grad/g02_radial",
+   "title": "Radial gradient",
+   "desc": "5 rings on a moving centre, chord ends evaluated every line.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "grad/g02_radial.ss",
+    "scan": "grad/g00_levels16.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      140
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "grad/g03_curtain",
+   "title": "Wave curtain",
+   "desc": "12 levels, each boundary a travelling sine.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "grad/g03_curtain.ss",
+    "scan": "grad/g00_levels16.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      144
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "pip/sphere",
+   "title": "Lit sphere",
+   "desc": "Smooth shading along each line: per line the area spans the disc's chord and its ramp starts at the light's value; the light turns. k0 extra light angle, k1 radius, k2 light speed. Crossfades Send 1 into its PIP layer 2, which is Send 2's picture: give Send 2 a different picture from Send 1 (another input, or one with nothing connected for black), or nothing visible changes.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "pip/p02_sphere_bands.ss",
+    "scan": "pip/p01_sphere.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k2": 0.15
+   },
+   "setup": [
+    {
+     "osc": "/send/1/pip/2/alpha",
+     "types": "f",
+     "args": [
+      1.0
+     ]
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "T",
+     "args": []
+    },
+    {
+     "wait": 300
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      1080
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1/blend",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/pip/2/area/1/blend"
+    },
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      78
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "F",
+     "args": []
+    },
+    {
+     "wait": 300
+    }
+   ]
+  },
+  {
+   "id": "pip/softwave",
+   "title": "Soft wavy wipe",
+   "desc": "Full-width ramps whose start follows a moving sine. k0 steepness, k1 wave amplitude. Crossfades Send 1 into its PIP layer 2, which is Send 2's picture: give Send 2 a different picture from Send 1 (another input, or one with nothing connected for black), or nothing visible changes.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "pip/p00_bands3.ss",
+    "scan": "pip/p03_softwave.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k0": 0.0
+   },
+   "setup": [
+    {
+     "osc": "/send/1/pip/2/alpha",
+     "types": "f",
+     "args": [
+      1.0
+     ]
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "T",
+     "args": []
+    },
+    {
+     "wait": 300
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      1080
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1/blend",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/pip/2/area/1/blend"
+    },
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      75
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "F",
+     "args": []
+    },
+    {
+     "wait": 300
+    }
+   ]
+  },
+  {
+   "id": "pip/stripes",
+   "title": "Soft stripes",
+   "desc": "Steeper ramps wrap into soft stripes (steps where the start wraps between bands). Crossfades Send 1 into its PIP layer 2, which is Send 2's picture: give Send 2 a different picture from Send 1 (another input, or one with nothing connected for black), or nothing visible changes.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": "pip/p00_bands3.ss",
+    "scan": "pip/p03_softwave.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k0": 0.6,
+    "k1": 0.5
+   },
+   "setup": [
+    {
+     "osc": "/send/1/pip/2/alpha",
+     "types": "f",
+     "args": [
+      1.0
+     ]
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "T",
+     "args": []
+    },
+    {
+     "wait": 300
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      1080
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1/blend",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/pip/2/area/1/blend"
+    },
+    {
+     "osc": "/send/1/shader/cells",
+     "types": "i",
+     "args": [
+      75
+     ],
+     "reply": "/send/1/shader/cells"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "s",
+     "args": [
+      "cells"
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/pip/2/area/1",
+     "types": "iiii",
+     "args": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "reply": "/send/1/pip/2/area/1"
+    },
+    {
+     "osc": "/send/1/pip/2/enabled",
+     "types": "F",
+     "args": []
+    },
+    {
+     "wait": 300
+    }
+   ]
+  },
+  {
+   "id": "pixel/px01_wheel",
+   "title": "Colour wheel (canvas)",
+   "desc": "A turning colour wheel evaluated on a 640x360 16-bit YCbCr OSD canvas, interpolated, double-buffered at the frame rate.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "pix/px01_wheel.ss"
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_osd_640x360.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "siiiii",
+     "args": [
+      "yc",
+      640,
+      360,
+      640,
+      360,
+      -2139062144
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ]
+  },
+  {
+   "id": "pixel/px03_plasma",
+   "title": "Plasma (canvas)",
+   "desc": "A four-term colour plasma on a 640x360 OSD canvas. k0 speed, k1 scale.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "pix/px03_plasma.ss"
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_osd_640x360.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "siiiii",
+     "args": [
+      "yc",
+      640,
+      360,
+      640,
+      360,
+      -2139062144
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ]
+  },
+  {
+   "id": "pixel/px02_tunnel",
+   "title": "Tunnel (canvas)",
+   "desc": "A tunnel on a 640x288 OSD canvas (the size that holds 24 fps).",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "pix/px02_tunnel.ss"
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_osd_640x288.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "siiiii",
+     "args": [
+      "yc",
+      640,
+      288,
+      640,
+      396,
+      -2139062144
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ]
+  },
+  {
+   "id": "pixel/px04_field",
+   "title": "Palette field (8-bit canvas)",
+   "desc": "The shader's value becomes an 8-bit palette index on a 960x432 canvas; the palette rotates every frame. k6 palette speed, k7 spread.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "pix/px04_field.ss"
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_p8_960x432.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "siiiii",
+     "args": [
+      "p8",
+      960,
+      432,
+      480,
+      324,
+      0
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ]
+  },
+  {
+   "id": "pixel/pal_cycle",
+   "title": "Palette cycling",
+   "desc": "A full-screen colour field drawn once into an 8-bit canvas, then animated only by rewriting the 256-entry palette every frame. k0 speed, k1 spread, k2 transparency over the video.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": null
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pal_cycle_1920x1080.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "siiiii",
+     "args": [
+      "p8",
+      1920,
+      1080,
+      0,
+      0,
+      0
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    },
+    {
+     "osc": "/send/1/shader/canvas",
+     "types": "s",
+     "args": [
+      "off"
+     ],
+     "reply": "/send/1/shader/canvas"
+    }
+   ]
+  },
+  {
+   "id": "pixel/framebuffer_wheel",
+   "title": "Colour wheel (frame buffer)",
+   "desc": "The pixel runner drawing a 320x160 panel straight into Send 1's frame buffer, raced against the input. k4/k5 move the panel. Uses Send 1's frame buffer in its linear layout: if a warp or rotation has been used since boot, starting switches it back (the output flashes white once); refused while a warp or rotation is on.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "pix/px01_wheel.ss"
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_runner_320x160.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/linear",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/linear"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "pixel/framebuffer_plasma",
+   "title": "Plasma (frame buffer, C)",
+   "desc": "A colour plasma panel written in C, drawn into Send 1's frame buffer. k0 speed, k1 scale, k2 chroma. Uses Send 1's frame buffer in its linear layout: if a warp or rotation has been used since boot, starting switches it back (the output flashes white once); refused while a warp or rotation is on.",
+   "kind": "run",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": null
+   },
+   "blobs": [
+    {
+     "slot": 2,
+     "file": "ddr/bin/pix_plasma.bin"
+    }
+   ],
+   "fast": true,
+   "knobs": {},
+   "setup": [
+    {
+     "osc": "/send/1/shader/linear",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/linear"
+    }
+   ],
+   "start": [
+    {
+     "osc": "/send/1/shader/run",
+     "types": "si",
+     "args": [
+      "pixel",
+      2
+     ],
+     "reply": "/send/1/shader/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/stop",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/stop"
+    }
+   ]
+  },
+  {
+   "id": "warp/ripple",
+   "title": "Ripple warp",
+   "desc": "Concentric waves from the centre through the warp LUT. k0 amplitude (px), k1 speed.",
+   "kind": "run",
+   "stages": {
+    "warp": "ripple.ss",
+    "vert": null,
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k0": 8.0,
+    "k1": 1.0
+   },
+   "setup": [],
+   "start": [
+    {
+     "osc": "/send/1/shader/warp/run",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/warp/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/warp/run",
+     "types": "F",
+     "args": [],
+     "reply": "/send/1/shader/warp/run"
+    }
+   ]
+  },
+  {
+   "id": "warp/glitch",
+   "title": "Glitch blocks",
+   "desc": "Block cells jump on a beat with a liquid wobble underneath. k0 jump amplitude (px), k1 beats per second.",
+   "kind": "run",
+   "stages": {
+    "warp": "glitch.ss",
+    "vert": null,
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {
+    "k0": 80.0
+   },
+   "setup": [],
+   "start": [
+    {
+     "osc": "/send/1/shader/warp/run",
+     "types": "T",
+     "args": [],
+     "reply": "/send/1/shader/warp/run"
+    }
+   ],
+   "stop": [
+    {
+     "osc": "/send/1/shader/warp/run",
+     "types": "F",
+     "args": [],
+     "reply": "/send/1/shader/warp/run"
+    }
+   ]
+  },
+  {
+   "id": "probe/frag1",
+   "title": "frag1",
+   "desc": "frag1.ss: scan stage for vertex mode. At each vertex: flip the write-side CbCr",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "frag1.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/frag2",
+   "title": "frag2",
+   "desc": "frag2.ss: scan stage for verts2. Two fixed tints by cell parity through the output",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "frag2.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/frag3",
+   "title": "frag3",
+   "desc": "frag3.ss: cell stage for verts3. The input channel permutation (the one register the MDIN",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "frag3.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/frag_all",
+   "title": "frag_all",
+   "desc": "",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "frag_all.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/scan1",
+   "title": "scan1",
+   "desc": "scan1.ss: per-scanline colour. Bands of channel permutation scroll down the frame,",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "scan1.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/scan2",
+   "title": "scan2",
+   "desc": "scan2.ss: a pattern inside the line. Evaluated every 2nd line at 12 points across",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "scan2.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts1",
+   "title": "verts1",
+   "desc": "verts1.ss: vertex stage. 48 points on two orbiting rings; each point carries its",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts1.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts2",
+   "title": "verts2",
+   "desc": "verts2.ss: a grid of 8 x 6 points, static unless the knobs add a ripple. Each point",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts2.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts3",
+   "title": "verts3",
+   "desc": "verts3.ss: a rippling checkerboard as cells. 8 columns x 12 slivers of 96 lines = 96 points;",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts3.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts_inv",
+   "title": "verts_inv",
+   "desc": "verts_inv.ss: the static 8 x 12 checker with inverted parity (test of per-line/per-frame register latching).",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts_inv.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts_k",
+   "title": "verts_k",
+   "desc": "verts_k.ss: knob-driven probe cells. Two columns per row: column 0 at x = 0 with value k6 (1 = swap; k2 is the scan stage's swap mode),",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts_k.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/verts_test",
+   "title": "verts_test",
+   "desc": "verts_test.ss: static 8 x 12 checker of 240 x 96 px cells (calibration target for the cell engine).",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "verts_test.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/xtest",
+   "title": "xtest",
+   "desc": "xtest.ss: is the output CSC offset applied inside the line? Pattern mode, 2 points per",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "xtest.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/band_lmid",
+   "title": "band_lmid",
+   "desc": "Hazard test: one static 800 px rectangle at x = 500, rows 600..779, to find which output rows the input-port Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/band_lmid.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/band_low",
+   "title": "band_low",
+   "desc": "Hazard test: one static 800 px rectangle at x = 500, rows 800..939, to find which output rows the input-port Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/band_low.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/band_mid",
+   "title": "band_mid",
+   "desc": "Hazard test: one static 800 px rectangle at x = 500, rows 480..619, to find which output rows the input-port Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/band_mid.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/band_top",
+   "title": "band_top",
+   "desc": "Hazard test: one static 800 px rectangle at x = 500, rows 100..399, to find which output rows the input-port Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/band_top.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/cols8",
+   "title": "cols8",
+   "desc": "cal: 8 full-height columns, 240 px each, p0 = column / 7 (for per-pixel value-register tests) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/cols8.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/csc_steps",
+   "title": "csc_steps",
+   "desc": "cal: input CSC coefficient 0 gain 0.5 .. 1.5 across the columns (in.p0 0..1) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/csc_steps.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/fullcell",
+   "title": "fullcell",
+   "desc": "cal: one cell covering the whole walk (lines 0..999), x 400..1400: hold registers never return to base Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/fullcell.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/narrow",
+   "title": "narrow",
+   "desc": "Timing calibration: four static rectangles 1, 8, 22 and 47 px wide at x = 300, 700, 1100, 1500, rows 300..499, Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/narrow.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/narrow2",
+   "title": "narrow2",
+   "desc": "Timing calibration: six static rectangles 1, 6, 12, 18, 24 and 30 px wide at x = 200 + 300 i, rows 300..499: Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/narrow2.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/osd_col",
+   "title": "osd_col",
+   "desc": "cal: OSD box plane colour B from the cells (box held open statically) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/osd_col.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/osd_const0",
+   "title": "osd_const0",
+   "desc": "cal: OSD box x0 = 0 everywhere (frame-latch check) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/osd_const0.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/osd_open0",
+   "title": "osd_open0",
+   "desc": "cal: OSD box opens at x0 = 0 inside the cells (shows where the writes land in OSD coordinates) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/osd_open0.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/pip_area_x_scan",
+   "title": "pip_area_x_scan",
+   "desc": "cal: PIP area 0 x0 / y0 / x1 per line: o0 = address strobe (bit 15 onto preloaded index 0), o1 = x0, o2 = y0, o3 = x1 Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/pip_area_x_scan.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/pip_disc_bands",
+   "title": "pip_disc_bands",
+   "desc": "cal: a disc in 6-line bands over lines 0..995 (166 points; lines outside the disc close the area) for the PIP area blend: per band p0 = chord left x, p1 = chord right x (the area's x0, x1); Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/pip_disc_bands.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/pip_inc_bands",
+   "title": "pip_inc_bands",
+   "desc": "cal: 18 full-width bands of 60 lines; p0 = the band's PIP area-0 ramp increment (1 .. 18) Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/pip_inc_bands.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/pip_inc_scan",
+   "title": "pip_inc_scan",
+   "desc": "cal: PIP area register write pair per edge: o0 = address write strobe (bit 15 onto the preloaded index), o1 = data Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/pip_inc_scan.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/pip_start_bands",
+   "title": "pip_start_bands",
+   "desc": "cal: PIP area 0 per band: op 0 = geometry (x0 300, y0 0, x1 1600), op 1 = mode word with ramp start = band * 160 Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/pip_start_bands.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/radial_nochord",
+   "title": "radial_nochord",
+   "desc": "Radial gradient: 5 concentric rings around a moving centre, in bands of 40 lines, 10 cells per band (the left and Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/radial_nochord.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/rects",
+   "title": "rects",
+   "desc": "Timing calibration: four static rectangles, left edges at x = 200, 600, 1000, 1400 px and widths 100, 150, Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/rects.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/slopes",
+   "title": "slopes",
+   "desc": "Timing calibration: two static shapes with known edge slopes, rows 300..499. Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/slopes.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/swap2",
+   "title": "swap2",
+   "desc": "Timing calibration: the input channel swap written twice per op (two map entries on one output), to Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "cal/swap2.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/vline",
+   "title": "vline",
+   "desc": "Vertical-drift test: 40 bands of 20 lines (rows 100..899), each with the same two 300 px rectangles at x = 400 and Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/vline.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/wide_1918",
+   "title": "wide_1918",
+   "desc": "Hazard test: one static rectangle from x = 0, 1918 px wide, rows 300..699 (the swap held across that part of every line). Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/wide_1918.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/wide_900",
+   "title": "wide_900",
+   "desc": "Hazard test: one static rectangle from x = 0, 900 px wide, rows 300..699 (the swap held across that part of every line). Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/wide_900.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/xsweep",
+   "title": "xsweep",
+   "desc": "Edge-placement test: 40 bands of 20 lines (rows 100..899). In band b, two 300 px rectangles start at Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/xsweep.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/cal/xsweep26",
+   "title": "xsweep26",
+   "desc": "Edge-placement test: 40 bands of 20 lines (rows 100..899). In band b, two 300 px rectangles start at Calibration probe for the cell engine timing and the PIP area blend.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "cal/xsweep26.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s01_swap_cells",
+   "title": "s01_swap_cells",
+   "desc": "Input channel permutation by cell parity (per pixel): p0 from the vertex stage picks the order. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s01_swap_cells.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s02_csc_gain_rows",
+   "title": "s02_csc_gain_rows",
+   "desc": "Output CSC row gains per line: red fades with v, blue with time, green steady. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s02_csc_gain_rows.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s03_offset_bands",
+   "title": "s03_offset_bands",
+   "desc": "Output CSC offsets (add mode) make horizontal bands of lifted Y and shifted Cb per cell parity. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s03_offset_bands.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s04_palette_cycle",
+   "title": "s04_palette_cycle",
+   "desc": "OSD layer-4 palette entry 1 cycles through hues down the frame; the strobe applies after any change. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s04_palette_cycle.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s05_wmc_cbcr_swap",
+   "title": "s05_wmc_cbcr_swap",
+   "desc": "Write-controller CbCr swap per line, toggled by a noise threshold that drifts with time. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s05_wmc_cbcr_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s06_dark_screen_lines",
+   "title": "s06_dark_screen_lines",
+   "desc": "Output dark screen on alternate groups of lines: a per-line venetian blind whose pitch is a knob. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s06_dark_screen_lines.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s07_tp_force_green",
+   "title": "s07_tp_force_green",
+   "desc": "Force the green test-pattern value on lines inside a travelling band (enable bit + 12-bit value). Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s07_tp_force_green.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s08_window_mask",
+   "title": "s08_window_mask",
+   "desc": "Window-mask enable + colour per line: the enable nibble and the colour index are separate fields so each Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s08_window_mask.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s09_digital_cbcr_swap",
+   "title": "s09_digital_cbcr_swap",
+   "desc": "Output digital CbCr swap (bit 4) flips every N lines where N shrinks toward the bottom. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s09_digital_cbcr_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s10_bw_extension",
+   "title": "s10_bw_extension",
+   "desc": "Black/white extension enable per line, gated by a sine so it pulses in bands. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s10_bw_extension.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s11_selective_colour",
+   "title": "s11_selective_colour",
+   "desc": "Selective colour: enable and region-display bits, with the cos-theta register swept down the frame. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s11_selective_colour.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s12_csc2_coef_gain",
+   "title": "s12_csc2_coef_gain",
+   "desc": "Second output CSC: coefficient 0 as a gain that ripples, offset Y added by cell parameter p2. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s12_csc2_coef_gain.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s13_420_pattern",
+   "title": "s13_420_pattern",
+   "desc": "4:2:0 test pattern enable on lines where a value-noise field exceeds a knob threshold. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s13_420_pattern.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s14_in_csc_offsets",
+   "title": "s14_in_csc_offsets",
+   "desc": "Input CSC offsets G and Y per line: a slow vertical gradient plus a flicker from the frame counter. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s14_in_csc_offsets.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s15_hdr_bypass",
+   "title": "s15_hdr_bypass",
+   "desc": "HDR (LUT) bypass bit toggled per line in cells: the LUT'd and the raw picture interleave as a checker. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s15_hdr_bypass.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s16_front_nr",
+   "title": "s16_front_nr",
+   "desc": "Front noise-reduction Y filter coefficient 0 swept with a triangle wave down the frame. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s16_front_nr.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s17_h_peaking",
+   "title": "s17_h_peaking",
+   "desc": "Horizontal peaking coefficient 0: strong on even cells, off on odd, with a time-varying bias. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s17_h_peaking.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s18_mfc_chroma_swap",
+   "title": "s18_mfc_chroma_swap",
+   "desc": "MFC0 chroma swap (immediate latch mode) and output-invalid bit: swap by parity, blank a moving band. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s18_mfc_chroma_swap.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s19_lut_steps",
+   "title": "s19_lut_steps",
+   "desc": "1D LUT step enables per line: step 1 on the top half, step 2 on the bottom, swapping with time. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s19_lut_steps.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/s20_hsize_force",
+   "title": "s20_hsize_force",
+   "desc": "Forced MFC horizontal size per line: the picture width breathes with a sine, enable bit set. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "corpus/s20_hsize_force.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v02_spiral",
+   "title": "v02_spiral",
+   "desc": "Points on an Archimedean spiral that slowly rotates; p0 = turn count, p2 = radius 0..1. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v02_spiral.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v03_lissajous",
+   "title": "v03_lissajous",
+   "desc": "Lissajous figure, 3:2, drifting phase; cells shrink toward the ends of the parameter. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v03_lissajous.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v04_scatter",
+   "title": "v04_scatter",
+   "desc": "Random scatter that re-rolls per frame on top of a fixed grid: in.rnd is fresh per evaluation. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v04_scatter.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v07_wave_columns",
+   "title": "v07_wave_columns",
+   "desc": "Each column is a vertical sine wave with its own phase; cells are short so the wave reads as a curve. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v07_wave_columns.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v08_diagonal_bars",
+   "title": "v08_diagonal_bars",
+   "desc": "Diagonal bars sweeping across: x position advances with the row and the time, wrapping at the frame edge. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v08_diagonal_bars.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v09_rings",
+   "title": "v09_rings",
+   "desc": "Concentric rings of 12 points each, radius by ring, slowly pulsing; p0 alternates per ring. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v09_rings.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v11_bounce",
+   "title": "v11_bounce",
+   "desc": "Bouncing cells: |sin| gives the bounce, higher columns bounce faster. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v11_bounce.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v12_jitter_checker",
+   "title": "v12_jitter_checker",
+   "desc": "Static checker with value-noise displacement; k0 scales the jitter, noise is smooth across the grid. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v12_jitter_checker.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v14_expanding_squares",
+   "title": "v14_expanding_squares",
+   "desc": "Nested squares that expand from the centre with the frame count; 4 points per square edge set. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v14_expanding_squares.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v15_zigzag",
+   "title": "v15_zigzag",
+   "desc": "A zigzag path across the frame: x triangle wave against the row index, animated phase. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v15_zigzag.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v16_field_lines",
+   "title": "v16_field_lines",
+   "desc": "Points placed along the field lines of two poles: angle from atan2 picks the row, radius the column. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v16_field_lines.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v17_two_grids",
+   "title": "v17_two_grids",
+   "desc": "Even points form a coarse grid, odd points a fine grid offset by half a cell and moving the other way. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v17_two_grids.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/corpus/v18_perspective_floor",
+   "title": "v18_perspective_floor",
+   "desc": "A floor grid in perspective: rows compress toward the horizon (1 / (1 + depth)), columns converge. Optimiser training corpus (corpus/README.md); not all were run on the device.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "corpus/v18_perspective_floor.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/showcase/ml11_osd_box",
+   "title": "ml11_osd_box",
+   "desc": "OSD simple box edges from the cells. DOES NOT WORK from the scan engine (2026-10-12): continuous writes to the box",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "showcase/ml11_osd_box.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/showcase/pt02_hsize_force",
+   "title": "pt02_hsize_force",
+   "desc": "mfc_hsize_force: the forced line width inside the shape (partial: resamples the rest of the line).",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "showcase/pt02_hsize_force.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/showcase/pt03_mfc_hsize",
+   "title": "pt03_mfc_hsize",
+   "desc": "mfc0_out_hsize: MFC output width inside the shape (partial; latch mode set to immediate by the harness).",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "showcase/pt03_mfc_hsize.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/shapes/sh10_osd_ribbon",
+   "title": "sh10_osd_ribbon",
+   "desc": "The sine ribbon in 6-line bands (132 points, rows 240..1032) for line-latched (hold) registers,",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "shapes/sh10_osd_ribbon.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/band_rows",
+   "title": "band_rows",
+   "desc": "Test shape: full-width cells over rows 400..699 (72 bands of 15 lines; bands outside have p0 = 0). For telling Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "tpg/band_rows.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/cd01_blank_disc",
+   "title": "cd01_blank_disc",
+   "desc": "Input CDC buffer 4 data blanking switched at the cell edges: the blank colour (0x1F2B..0x1F2D, preset) inside the shape. Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/cd01_blank_disc.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/cd02_blank_y",
+   "title": "cd02_blank_y",
+   "desc": "Blank colour luma per cell (input CDC buffer 4, 0x1F2C) with the blank held on (pre-write 0x1F04 = 0x1000). Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/cd02_blank_y.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/grid8",
+   "title": "grid8",
+   "desc": "Test shape: 8 columns x 20 rows of 240x15 cells over rows 400..699; p0 = column / 8 (0, 0.125 .. 0.875). Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": "tpg/grid8.ss",
+    "scan": null
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/os01_alpha",
+   "title": "os01_alpha",
+   "desc": "OSD sprite 0 alpha per cell (with `imcu canvas` on): p0 = 0..1 -> alpha 0..15. Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/os01_alpha.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/os02_block_g",
+   "title": "os02_block_g",
+   "desc": "OSD block (background box) colour green byte per cell: p0 = 0..1 -> 0..255 (box set up by the test harness). Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/os02_block_g.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/os03_sprite_x",
+   "title": "os03_sprite_x",
+   "desc": "OSD sprite 0 x position per cell (with `imcu canvas` on): p0 * 100 px. Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/os03_sprite_x.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/tp01_ramp_disc",
+   "title": "tp01_ramp_disc",
+   "desc": "Input test pattern inside the shape: the input port's own pattern generator (0x013D) switched on at the cell edges. Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/tp01_ramp_disc.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  },
+  {
+   "id": "probe/tpg/tp02_out_ramp",
+   "title": "tp02_out_ramp",
+   "desc": "Output test pattern inside the shape: Send 1's output stage pattern generator (0x1C01 out_test_ptrn) set at the Mid-line register hunt (docs/MIDLINE_REGISTER_SWEEP.md): needs register presets from the test harness.",
+   "kind": "probe",
+   "stages": {
+    "warp": null,
+    "vert": null,
+    "scan": "tpg/tp02_out_ramp.ss"
+   },
+   "blobs": [],
+   "fast": true,
+   "knobs": {},
+   "setup": [],
+   "start": [],
+   "stop": []
+  }
+ ]
+}

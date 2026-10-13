@@ -144,4 +144,52 @@ void main() {
     expect(tester.getSize(asm).width, closeTo(w0 + 150, 1));
     await _shot(tester, 'io_scan');
   });
+
+  testWidgets('the Examples button opens the bundled examples; Open loads a stage (screenshot)', (tester) async {
+    SharedPreferences.setMockInitialValues({'draft': templates['Warp: ripple']!.$2, 'slot': 0});
+    tester.view.physicalSize = const Size(1440, 880);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(RepaintBoundary(key: _root, child: const ShaderIde()));
+    await _settle(tester);
+    await tester.tap(find.text('Examples'));
+    await _settle(tester);
+    expect(find.text('EXAMPLES'), findsOneWidget);
+    expect(find.textContaining('from examples.json'), findsOneWidget);
+    await tester.enterText(find.descendant(of: find.byType(Dialog), matching: find.byType(TextField)), 'lit sphere');
+    await tester.pump();
+    await tester.tap(find.descendant(of: find.byType(ListView), matching: find.text('Lit sphere')).first);
+    await tester.pump(const Duration(milliseconds: 400)); // a row also takes double taps
+    expect(find.text('pip/sphere'), findsOneWidget); // the detail pane shows it
+    await tester.tap(find.descendant(of: find.byType(Dialog), matching: find.text('Open')));
+    await _settle(tester);
+    expect(find.text('EXAMPLES'), findsNothing);
+    expect(find.textContaining('Scan stage'), findsOneWidget); // status bar: compiles as a scan stage
+    await _shot(tester, 'ide_example_open');
+
+    // the example is a bundle: its vertex stage is one tab away, and edits stay with their stage
+    final code = tester.widget<CodeEditor>(find.byType(CodeEditor)).controller;
+    final scan = code.text;
+    expect(scan, contains('@out o0'));
+    await tester.tap(find.text('VERTEX'));
+    await _settle(tester);
+    final vert = code.text;
+    expect(vert, isNot(scan));
+    expect(vert, contains('out.vx'));
+    expect(find.textContaining('Vertex stage'), findsOneWidget);
+    code.text = '// edited\n$vert';
+    await _settle(tester);
+    await tester.tap(find.text('SCAN'));
+    await _settle(tester);
+    expect(code.text, scan);
+    await tester.tap(find.text('VERTEX'));
+    await _settle(tester);
+    expect(code.text, startsWith('// edited\n'));
+    expect(find.textContaining('Vertex stage'), findsOneWidget);
+    await _shot(tester, 'ide_bundle_vertex');
+    // the warp tab is empty: this example has no warp stage
+    await tester.tap(find.text('WARP'));
+    await _settle(tester);
+    expect(code.text, isEmpty);
+  });
 }

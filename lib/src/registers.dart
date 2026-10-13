@@ -26,3 +26,35 @@ Map<String, Register> parseRegisters(String text) {
 
 /// The table compiled into the package (tool/gen_registers.dart).
 final Map<String, Register> registers = parseRegisters(registersInc);
+
+/// Per-Send PIP area ports, resolved by the firmware when the map is set:
+/// `send<N>.pip<M>.<field>` (Send 1..3, PIP layer 1..4). A layer's blend stage depends on how
+/// many layers are enabled and each Send has its own output channel, so the map carries a
+/// symbolic register, 0xF000 | kind << 8 | send << 4 | layer (kind 0 = area address port,
+/// 1 = area data port), and the resident's map setter turns it into the port address.
+const pipFields = {
+  'area_addr': (0, 0xFFFF, 0, 'PIP area address port (area select and field address)'),
+  'area_data': (1, 0xFFFF, 0, 'PIP area data port (the value written to the selected field)'),
+  'area_wr': (0, 0x8000, 15, 'PIP area address port, write strobe bit'),
+  'area_val': (1, 0x1FFF, 0, 'PIP area data port, 13-bit value field'),
+};
+
+final _pipRe = RegExp(r'^send(\d+)\.pip(\d+)\.(\w+)$');
+
+/// A `send<N>.pip<M>.<field>` name as a register; null for anything else. Throws a
+/// [FormatException] for a well-formed name out of range (Send 1..3, layer 1..4, a known field).
+Register? symbolicRegister(String name) {
+  final m = _pipRe.firstMatch(name);
+  if (m == null) return null;
+  final send = int.parse(m.group(1)!), layer = int.parse(m.group(2)!);
+  final f = pipFields[m.group(3)!];
+  if (send < 1 || send > 3) throw FormatException('$name: Send $send? (1..3)');
+  if (layer < 1 || layer > 4) throw FormatException('$name: PIP layer $layer? (1..4)');
+  if (f == null) throw FormatException('$name: field ${m.group(3)}? (${pipFields.keys.join(', ')})');
+  final (kind, mask, shift, what) = f;
+  return Register(name, 0xF000 | kind << 8 | send << 4 | layer, mask, shift, 'raw', 'port',
+      'Send $send, PIP $layer: $what (resolved by the firmware)');
+}
+
+/// A named register: a registers.inc row or a symbolic per-Send name.
+Register? lookupRegister(String name, [Map<String, Register>? table]) => (table ?? registers)[name] ?? symbolicRegister(name);

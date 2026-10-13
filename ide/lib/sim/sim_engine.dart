@@ -462,7 +462,12 @@ class SimEngine {
       final f = m.group(2)!.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
       if (f.isEmpty || e >= p.outMap.length) continue;
       final entry = p.outMap[e++];
-      final r = f.length >= 4 ? null : registers[f[0]];
+      Register? r;
+      try {
+        r = f.length >= 4 ? null : lookupRegister(f[0]); // a registers.inc row or a send<N>.pip<M> port
+      } on FormatException {
+        r = null;
+      }
       final mode = switch (entry.mode & 15) { 0 => 'raw', 1 => 'gain', 2 => 'add', 3 => 'unit', _ => 'strobe' };
       final gran = r?.granularity ?? (entry.mode & 0x10 != 0 ? 'line' : 'pixel');
       final fm = entry.mask == 0 ? 0 : entry.mask >> entry.shift;

@@ -9,3 +9,19 @@ environment:
 dev_dependencies:
   test: ^1.25.0
   lints: ^5.0.0
+
+# examples assets (written by tool/sync_examples.dart): the IDE loads them as
+# packages/ae32k_shader_compiler/examples/...
+flutter:
+  assets:
+    - examples/
+    - examples/cal/
+    - examples/corpus/
+    - examples/ddr/
+    - examples/ddr/bin/
+    - examples/grad/
+    - examples/pip/
+    - examples/pix/
+    - examples/shapes/
+    - examples/showcase/
+    - examples/tpg/
