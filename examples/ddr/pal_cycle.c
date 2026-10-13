@@ -10,8 +10,6 @@
 #include "stage.h"
 #define HOST(r) (*(volatile unsigned short *)(0x72000000u + (unsigned)(r) * 4u))
 #define LOCAL(r) (*(volatile unsigned short *)(0x70000000u + (unsigned)(r) * 4u))
-#define U_RB  (*(volatile unsigned int *)0x80010800u)
-#define U_LSR (*(volatile unsigned int *)0x80010814u)
 #ifndef W
 #define W 1920
 #endif
@@ -24,10 +22,11 @@ static char line[96]; static unsigned ln;
 static unsigned hexv(const char **pp) { const char *p = *pp; unsigned v = 0; while (*p == ' ') p++;
     for (;; p++) { char c = *p; unsigned d; if (c >= '0' && c <= '9') d = c - '0'; else if (c >= 'a' && c <= 'f') d = c - 'a' + 10; else if (c >= 'A' && c <= 'F') d = c - 'A' + 10; else break; v = (v << 4) | d; }
     *pp = p; return v; }
-static unsigned poll(int *knob)
+static unsigned poll(struct ctx *c)
 {
-    while (U_LSR & 1) {
-        char ch = (char)(U_RB & 0xFF);
+    int *knob = c->knob, r;
+    while ((r = c->rx()) >= 0) {
+        char ch = (char)r;
         if (ch == '\r') continue;
         if (ch != '\n') { if (ln < sizeof(line) - 1) line[ln++] = ch; continue; }
         line[ln] = 0; ln = 0;
@@ -58,7 +57,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
                 w |= (unsigned)(((f + 5 * 16384) * 205) >> 16 & 255) << (k * 8);   /* -5..5 (Q14) -> 0..255 */
             }
             *q++ = w;
-            if ((U_LSR & 1) && poll(c->knob)) quit = 1;                /* drain every dword: a knob line overruns the FIFO in ~50 us */
+            if (poll(c)) quit = 1;                /* stop/yield lines: the resident buffers the UART (ctx->rx) */
         }
         if (quit) break;
         if (++rows_done >= H) drawn = 1;
@@ -67,7 +66,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
         unsigned n = 0, speed = 1 + (unsigned)(c->knob[0] >> 12), spread = 1 + (unsigned)(c->knob[1] >> 13);
         unsigned a15 = 15 - (unsigned)((c->knob[2] > 65536 ? 65536 : c->knob[2] < 0 ? 0 : c->knob[2]) * 15 >> 16);
         HOST(0x0010) = 1;                                             /* wait for the output vsync, then rewrite the palette */
-        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c)) { quit = 1; break; } }
         if (quit) break;
         LOCAL(0x1000) = (unsigned short)((LOCAL(0x1000) & ~((1u << 11) | 7u)) | (1u << 7) | 4u);   /* layer 4, no auto-increment, palette_dn_mode */
         if (a15 != sp_alpha) { LOCAL(0x101F) = (unsigned short)((LOCAL(0x101F) & ~15u) | a15); sp_alpha = a15; }   /* sprite alpha: only on change (continuous writes hide the sprite) */
@@ -77,10 +76,10 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
             LOCAL(0x1078) = (unsigned short)((255u << 8) | (unsigned)r);
             LOCAL(0x1079) = (unsigned short)(((unsigned)g << 8) | (unsigned)b);
             LOCAL(0x107A) = (unsigned short)(0x8000u | i);
-            if (!(i & 15) && (U_LSR & 1) && poll(c->knob)) quit = 1;
+            if (!(i & 15) && poll(c)) quit = 1;
         }
         frame++;
-        if ((U_LSR & 1) && poll(c->knob)) quit = 1;
+        if (poll(c)) quit = 1;
     }
     HOST(0x0009) = s9; HOST(0x0002) = s2;
     c->out[0] = (int)(frame << 16);

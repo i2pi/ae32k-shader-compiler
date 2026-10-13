@@ -6,8 +6,6 @@
 #include "stage.h"
 #define HOST(r) (*(volatile unsigned short *)(0x72000000u + (unsigned)(r) * 4u))
 #define LOCAL(r) (*(volatile unsigned short *)(0x70000000u + (unsigned)(r) * 4u))
-#define U_RB  (*(volatile unsigned int *)0x80010800u)
-#define U_LSR (*(volatile unsigned int *)0x80010814u)
 #define FS 0x0032A000u
 #define ST 3072u
 #define X0 800
@@ -26,10 +24,11 @@ static unsigned hexv(const char **pp) { const char *p = *pp; unsigned v = 0; whi
     for (;; p++) { char c = *p; unsigned d; if (c >= '0' && c <= '9') d = c - '0'; else if (c >= 'a' && c <= 'f') d = c - 'a' + 10; else if (c >= 'A' && c <= 'F') d = c - 'A' + 10; else break; v = (v << 4) | d; }
     *pp = p; return v; }
 /* poll the UART: 0 = nothing / knobs taken, 1 = return (stop or yield line) */
-static unsigned poll(int *knob)
+static unsigned poll(struct ctx *c)
 {
-    while (U_LSR & 1) {
-        char ch = (char)(U_RB & 0xFF);
+    int *knob = c->knob, r;
+    while ((r = c->rx()) >= 0) {
+        char ch = (char)r;
         if (ch == '\r') continue;
         if (ch != '\n') { if (ln < sizeof(line) - 1) line[ln++] = ch; continue; }
         line[ln] = 0; ln = 0;
@@ -62,13 +61,13 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
     while (!quit) {
         unsigned tgt, f, n = 0;
         int spd = 65536 + c->knob[0], scl = 65536 + c->knob[1], camt = 65536 - c->knob[2];
-        HOST(0x0010) = 1; while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+        HOST(0x0010) = 1; while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c)) { quit = 1; break; } }
         if (quit) break;
         cur = (LOCAL(0x042D) >> 4) & 15; if (cur > 2) cur = 0;
         tgt = cur + step; while (tgt >= 3) tgt -= 3;
         n = 0;                                                       /* wait until the input has written past the panel in this slot */
         for (;;) { unsigned cnt = LOCAL(0x1F47), d = (cnt - lbase) & 0xFFFFu; while (d >= 1125u) d -= 1125u; lbase = (cnt - d) & 0xFFFFu;   /* 1125 counts per frame (every line); rebase each read: the 16-bit count wraps at 65536, not a multiple of 1125 */
-                   if (d >= Y0 + NR + GATE || ++n > 400000u) break; if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+                   if (d >= Y0 + NR + GATE || ++n > 400000u) break; if (!(n & 255) && poll(c)) { quit = 1; break; } }
         if (quit) break;
         tgt = (LOCAL(0x042D) >> 12) & 15; if (tgt > 2) tgt = 0;           /* the slot the input is writing: it has passed the panel, so the drawing
                                                                           * survives until the input comes back to this slot (whichever frame the output reads) */
@@ -76,7 +75,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
         if (camt < 0) camt = 0;
         for (y = 0; y < NR && !quit; y++) {
             unsigned ys = (unsigned)((y * (unsigned)scl) >> 16);
-            if (poll(c->knob)) { quit = 1; break; }
+            if (poll(c)) { quit = 1; break; }
             for (pl = 0; pl < 3; pl++) {
                 unsigned ad = PB[pl] + tgt * FS + (Y0 + y) * ST, msb = (ad >> 26) & 3;
                 volatile unsigned *row;
@@ -87,7 +86,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
                 va = (ry + sn(s, f * 4)) >> sh; if (pl) va = (va * camt) >> 16; va += 2048;
                 for (ck = 0; ck < NC; ck++) {
                     volatile unsigned *q = row + ck * 4;
-                    if ((U_LSR & 1) && poll(c->knob)) { quit = 1; break; }   /* drain the UART every chunk: at ~3 Mbaud a knob line overruns the FIFO within a row */
+                    if (poll(c)) { quit = 1; break; }   /* stop/yield lines, every chunk */
                     unsigned xs = (unsigned)((((ck + 1) * 10) * (unsigned)scl) >> 16), px[10], a, b, cc, d;
                     int cx = pl == 0 ? sn(s, xs + f * 4) + sn(s, ((xs + ys) >> 1) + f * 5) : pl == 1 ? sn(s, ((xs * 3 * 13107) >> 16) + f * 3) : sn(s, ((xs * 2 * 13107) >> 16) + 128 + f * 6);
                     vb = (ry + cx) >> sh; if (pl) vb = (vb * camt) >> 16; vb += 2048;

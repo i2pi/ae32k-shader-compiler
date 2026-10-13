@@ -157,7 +157,7 @@ the slot and upload flags apply.
 | Flag | Default | What it does |
 |---|---|---|
 | `--scan` | | Compile for slot 1, the scan stage (0x1000E000). Its `@out` map is sent with the upload. |
-| `--vert` | | Compile for slot 2, the vertex stage (0x1000A000). |
+| `--vert` | | Compile for slot 2, the vertex stage (0x1000A800). |
 | `--slot N` | `0` | Compile for slot N: 0 warp (0x1000C000), 1 scan, 2 vertex. `--vert` wins over `--scan`, and either wins over `--slot`. The code is placed for its slot, so upload it to the slot it was built for. |
 | `--fast` | off | Drop the overflow handling for speed and size: `*` wraps instead of saturating, and `x / 0` gives +-32767.99 instead of 0 (`/` still saturates). Every other result is identical. See below. |
 | `--registers FILE` | compiled-in copy | The `registers.inc` that named `@out` lines resolve against. Use it to try register rows that are newer than the copy in the package. |

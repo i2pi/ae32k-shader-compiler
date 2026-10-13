@@ -4,15 +4,17 @@
 // convention: first argument and return value in R8 (second argument R9); R0-R7 and
 // R10-R14 are preserved by callees; LR holds the return address; %SP is its own register.
 
-/// Slot base addresses in ISPM (warp, scan, vertex). The resident owns ISPM below 0xA000.
-const slotAddr = {0: 0x1000C000, 1: 0x1000E000, 2: 0x1000A000};
-const slotBytes = 0x2000;
+/// Slot base addresses in ISPM (warp, scan, vertex). The resident owns ISPM below 0xA800.
+const slotAddr = {0: 0x1000C000, 1: 0x1000E000, 2: 0x1000A800};
+
+/// Slot sizes: 8 KB for warp and scan, 6 KB for vertex (0xA800..0xBFFF).
+const slotBytes = {0: 0x2000, 1: 0x2000, 2: 0x1800};
 
 /// The OSC upload buffer caps a blob at 4 KB.
 const maxBlobBytes = 4096;
 
 /// struct ctx field offsets (bytes): x y u v t frame heat mvx mvy luma knob[8] rnd w h
-/// out[16] p[4] sin256.
+/// out[16] p[4] sin256 rx.
 const ctxInput = {
   'x': 0, 'y': 4, 'u': 8, 'v': 12, 't': 16, 'frame': 20, 'heat': 24, 'mvx': 28, 'mvy': 32,
   'luma': 36,
@@ -22,7 +24,8 @@ const ctxInput = {
 };
 const ctxOut = 84; // int out[16]
 const ctxSin = 164; // const short *sin256
-const ctxBytes = 168;
+const ctxRx = 168; // int (*rx)(void): next UART0 byte or -1 (C stages only)
+const ctxBytes = 172;
 
 /// Output names (shader.py OUTPUTS). Several stages share slots: warp dx/dy, scan gr..pb,
 /// vertex vx/vy/p0..p3, and o0..o15 address any slot.

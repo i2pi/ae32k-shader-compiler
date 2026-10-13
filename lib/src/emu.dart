@@ -419,7 +419,7 @@ class StageRunner {
   final int slot;
   final List<int> blob;
   StageRunner(this.blob, {this.slot = 0}) {
-    if (blob.length > slotBytes) throw ArgumentError('blob larger than a slot');
+    if (blob.length > slotBytes[slot]!) throw ArgumentError('blob larger than a slot');
     // The device arms len/4 words and drops the rest; refuse what it would truncate.
     if (blob.length % 4 != 0) throw ArgumentError('blob is ${blob.length} bytes, not a multiple of 4');
   }

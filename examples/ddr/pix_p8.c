@@ -8,8 +8,6 @@
 #include "stage.h"
 #define HOST(r) (*(volatile unsigned short *)(0x72000000u + (unsigned)(r) * 4u))
 #define LOCAL(r) (*(volatile unsigned short *)(0x70000000u + (unsigned)(r) * 4u))
-#define U_RB  (*(volatile unsigned int *)0x80010800u)
-#define U_LSR (*(volatile unsigned int *)0x80010814u)
 #ifndef W
 #define W 960                                                        /* must match `imcu canvas p8 W H ...` */
 #endif
@@ -34,10 +32,11 @@ static unsigned hexv(const char **pp) { const char *p = *pp; unsigned v = 0; whi
     for (;; p++) { char c = *p; unsigned d; if (c >= '0' && c <= '9') d = c - '0'; else if (c >= 'a' && c <= 'f') d = c - 'a' + 10; else if (c >= 'A' && c <= 'F') d = c - 'A' + 10; else break; v = (v << 4) | d; }
     *pp = p; return v; }
 /* poll the UART: 0 = nothing / knobs taken, 1 = return (stop or yield line) */
-static unsigned poll(int *knob)
+static unsigned poll(struct ctx *c)
 {
-    while (U_LSR & 1) {
-        char ch = (char)(U_RB & 0xFF);
+    int *knob = c->knob, r;
+    while ((r = c->rx()) >= 0) {
+        char ch = (char)r;
         if (ch == '\r') continue;
         if (ch != '\n') { if (ln < sizeof(line) - 1) line[ln++] = ch; continue; }
         line[ln] = 0; ln = 0;
@@ -60,7 +59,7 @@ static int eval_row(struct ctx *c, unsigned j, int *dst)
         for (o = 0; o < 3; o++) c->out[o] = 0;
         SHADER(c);
         dst[k] = clampi((c->out[0] * 255) >> 8, 0, 255 * 256);            /* Q16 0..1 -> Q8 0..255 */
-        if ((U_LSR & 1) && poll(c->knob)) return 1;
+        if (poll(c)) return 1;
     }
     return 0;
 }
@@ -77,7 +76,7 @@ static void palette(struct ctx *c)
         LOCAL(0x1078) = (unsigned short)((255u << 8) | (unsigned)r);
         LOCAL(0x1079) = (unsigned short)(((unsigned)g << 8) | (unsigned)b);
         LOCAL(0x107A) = (unsigned short)(0x8000u | i);
-        if (!(i & 15) && (U_LSR & 1)) poll(c->knob);
+        if (!(i & 15)) poll(c);
     }
 }
 /* point the sprite (layer 4, sprite 0) at buffer b; the OSD takes it at the next vertical blank */
@@ -116,7 +115,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
                         *q++ = ((unsigned)i0 >> 8) | ((unsigned)(i0 + di) & 0xFF00u) | (((unsigned)(i0 + 2 * di) & 0xFF00u) << 8) | (((unsigned)(i0 + 3 * di) & 0xFF00u) << 16);
                         i0 += di4;
                     }
-                    if (!(k & 3) && (U_LSR & 1) && poll(c->knob)) { quit = 1; break; }
+                    if (!(k & 3) && poll(c)) { quit = 1; break; }
                 }
                 if (quit) break;
             }
@@ -125,7 +124,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
         show(back); back ^= 1; frame++;
         /* wait for the vsync that applies the new address: after it the other buffer is free to draw */
         HOST(0x0010) = 1;
-        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c)) { quit = 1; break; } }
         if (!quit) palette(c);                                        /* in the blanking after the flip */
 #ifdef MEASURE
         if (++m_n >= MEASURE) quit = 1;

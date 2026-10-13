@@ -11,8 +11,6 @@
 #include "stage.h"
 #define HOST(r) (*(volatile unsigned short *)(0x72000000u + (unsigned)(r) * 4u))
 #define LOCAL(r) (*(volatile unsigned short *)(0x70000000u + (unsigned)(r) * 4u))
-#define U_RB  (*(volatile unsigned int *)0x80010800u)
-#define U_LSR (*(volatile unsigned int *)0x80010814u)
 #ifndef W
 #define W 640                                                        /* must match `imcu canvas yc W H ...` */
 #endif
@@ -37,10 +35,11 @@ static unsigned hexv(const char **pp) { const char *p = *pp; unsigned v = 0; whi
     for (;; p++) { char c = *p; unsigned d; if (c >= '0' && c <= '9') d = c - '0'; else if (c >= 'a' && c <= 'f') d = c - 'a' + 10; else if (c >= 'A' && c <= 'F') d = c - 'A' + 10; else break; v = (v << 4) | d; }
     *pp = p; return v; }
 /* poll the UART: 0 = nothing / knobs taken, 1 = return (stop or yield line) */
-static unsigned poll(int *knob)
+static unsigned poll(struct ctx *c)
 {
-    while (U_LSR & 1) {
-        char ch = (char)(U_RB & 0xFF);
+    int *knob = c->knob, r;
+    while ((r = c->rx()) >= 0) {
+        char ch = (char)r;
         if (ch == '\r') continue;
         if (ch != '\n') { if (ln < sizeof(line) - 1) line[ln++] = ch; continue; }
         line[ln] = 0; ln = 0;
@@ -65,7 +64,7 @@ static int eval_row(struct ctx *c, unsigned j, int (*dst)[NSX])
         dst[0][k] = clampi(16 * 256 + ((c->out[0] * 219) >> 8), 16 * 256, 235 * 256);          /* Q16 0..1 -> Q8 16..235 */
         dst[1][k] = clampi(128 * 256 + ((c->out[1] * 224) >> 8), 16 * 256, 240 * 256);         /* Q16 -0.5..0.5 -> Q8 16..240 */
         dst[2][k] = clampi(128 * 256 + ((c->out[2] * 224) >> 8), 16 * 256, 240 * 256);
-        if ((U_LSR & 1) && poll(c->knob)) return 1;
+        if (poll(c)) return 1;
     }
     return 0;
 }
@@ -107,7 +106,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
                         *q++ = ((unsigned)y0 >> 8) | ((unsigned)b0 & 0xFF00u) | (((unsigned)(y0 + dy) & 0xFF00u) << 8) | (((unsigned)r0 & 0xFF00u) << 16);
                         y0 += dy2; b0 += db; r0 += dr;
                     }
-                    if (!(k & 3) && (U_LSR & 1) && poll(c->knob)) { quit = 1; break; }   /* every 4th span (~20 us): a knob line overruns the FIFO in ~50 us */
+                    if (!(k & 3) && poll(c)) { quit = 1; break; }   /* stop/yield lines, every 4th span */
                 }
                 if (quit) break;
             }
@@ -116,7 +115,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
         show(back); back ^= 1; frame++;
         /* wait for the vsync that applies the new address: after it the other buffer is free to draw */
         HOST(0x0010) = 1;
-        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+        while (!(HOST(0x0010) & 1) && ++n < 4000000u) { if (!(n & 255) && poll(c)) { quit = 1; break; } }
 #ifdef MEASURE
         if (++m_n >= MEASURE) quit = 1;
 #endif

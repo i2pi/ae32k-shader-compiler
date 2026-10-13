@@ -12,8 +12,6 @@
 #include "stage.h"
 #define HOST(r) (*(volatile unsigned short *)(0x72000000u + (unsigned)(r) * 4u))
 #define LOCAL(r) (*(volatile unsigned short *)(0x70000000u + (unsigned)(r) * 4u))
-#define U_RB  (*(volatile unsigned int *)0x80010800u)
-#define U_LSR (*(volatile unsigned int *)0x80010814u)
 #define FS 0x0032A000u
 #ifndef LPF
 #define LPF 1125u                                                    /* input line counter counts per frame (all lines, not 1080) */
@@ -52,10 +50,11 @@ static unsigned hexv(const char **pp) { const char *p = *pp; unsigned v = 0; whi
     for (;; p++) { char c = *p; unsigned d; if (c >= '0' && c <= '9') d = c - '0'; else if (c >= 'a' && c <= 'f') d = c - 'a' + 10; else if (c >= 'A' && c <= 'F') d = c - 'A' + 10; else break; v = (v << 4) | d; }
     *pp = p; return v; }
 /* poll the UART: 0 = nothing / knobs taken, 1 = return (stop or yield line) */
-static unsigned poll(int *knob)
+static unsigned poll(struct ctx *c)
 {
-    while (U_LSR & 1) {
-        char ch = (char)(U_RB & 0xFF);
+    int *knob = c->knob, r;
+    while ((r = c->rx()) >= 0) {
+        char ch = (char)r;
         if (ch == '\r') continue;
         if (ch != '\n') { if (ln < sizeof(line) - 1) line[ln++] = ch; continue; }
         line[ln] = 0; ln = 0;
@@ -80,7 +79,7 @@ static int eval_row(struct ctx *c, unsigned yy, short (*dst)[NS])
         SHADER(c);
         { int Y = c->out[0] >> 4, Cb = 2048 + (c->out[1] >> 4), Cr = 2048 + (c->out[2] >> 4);
           dst[0][k] = (short)(Y < 0 ? 0 : Y > 4095 ? 4095 : Y); dst[1][k] = (short)(Cb < 0 ? 0 : Cb > 4095 ? 4095 : Cb); dst[2][k] = (short)(Cr < 0 ? 0 : Cr > 4095 ? 4095 : Cr); }
-        if ((U_LSR & 1) && poll(c->knob)) return 1;
+        if (poll(c)) return 1;
     }
     return 0;
 }
@@ -119,14 +118,14 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
 #ifdef PHLOG
                    if (!seen && (HOST(0x0010) & 1)) { seen = 1; if (m_n < 16) m_log[m_n >> 1] |= (d | 0x8000u) << ((m_n & 1) * 16); }
 #endif
-                   if (d < Y0 + NR + GATE || ++n > 4000000u) break; if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+                   if (d < Y0 + NR + GATE || ++n > 4000000u) break; if (!(n & 255) && poll(c)) { quit = 1; break; } }
         if (quit) break;
         n = 0;
         for (;;) { cnt = LOCAL(0x1F47); d = (cnt - lbase) & 0xFFFFu; while (d >= LPF) d -= LPF; lbase = (cnt - d) & 0xFFFFu;
 #ifdef PHLOG
                    if (!seen && (HOST(0x0010) & 1)) { seen = 1; if (m_n < 16) m_log[m_n >> 1] |= (d | 0x8000u) << ((m_n & 1) * 16); }
 #endif
-                   if (d >= Y0 + NR + GATE || ++n > 4000000u) break; if (!(n & 255) && poll(c->knob)) { quit = 1; break; } }
+                   if (d >= Y0 + NR + GATE || ++n > 4000000u) break; if (!(n & 255) && poll(c)) { quit = 1; break; } }
 #ifdef PHLOG
         }
 #endif
@@ -144,7 +143,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
 #endif
         for (y = 0; y < NR && !quit; y++) {
             short (*src)[NS];
-            if (poll(c->knob)) { quit = 1; break; }
+            if (poll(c)) { quit = 1; break; }
             if (y == 0) { if (eval_row(c, 0, rc)) { quit = 1; break; } src = rc; }
             else if (!(y & 1)) src = rc;                                   /* even row: evaluated with the odd row above */
             else {                                                          /* odd row: evaluate the next row, draw the average */
@@ -166,7 +165,7 @@ __attribute__((section(".entry"))) int stage(struct ctx *c)
                     int s0 = src[pl][ck >> 1], s1 = src[pl][(ck >> 1) + 1], m2 = (s0 + s1) >> 1, va = (ck & 1) ? m2 : s0, vb = (ck & 1) ? s1 : m2;   /* two chunks per sample span */
                     unsigned P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, a, b, cc, d;
                     int acc = va << 12, st = (vb - va) * 410;           /* pixel j = va + (vb - va) * j / 10, by adds; stays in 0..4095 */
-                    if ((U_LSR & 1) && poll(c->knob)) { quit = 1; break; }
+                    if (poll(c)) { quit = 1; break; }
                     P0 = (unsigned)va; acc += st; P1 = (unsigned)(acc >> 12); acc += st; P2 = (unsigned)(acc >> 12); acc += st;
                     P3 = (unsigned)(acc >> 12); acc += st; P4 = (unsigned)(acc >> 12); acc += st; P5 = (unsigned)(acc >> 12); acc += st;
                     P6 = (unsigned)(acc >> 12); acc += st; P7 = (unsigned)(acc >> 12); acc += st; P8 = (unsigned)(acc >> 12); acc += st;
